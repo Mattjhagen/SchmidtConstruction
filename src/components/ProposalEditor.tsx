@@ -3,11 +3,12 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/db';
 import { PROPOSAL_TEMPLATES } from '../lib/templates';
-import { Proposal, Project, Client, ProposalVersion, ProposalLineItem, ProjectType } from '../lib/types';
+import { Proposal, Project, Client, ProposalVersion, ProposalLineItem, ProjectType, CatalogInsertResult } from '../lib/types';
+import CatalogPicker from './CatalogPicker';
 import { 
   FileText, 
   Trash2, 
@@ -21,7 +22,9 @@ import {
   Eye, 
   Printer, 
   AlertTriangle,
-  FolderOpen
+  FolderOpen,
+  Bookmark,
+  Library
 } from 'lucide-react';
 
 interface ProposalEditorProps {
@@ -79,6 +82,49 @@ export default function ProposalEditor({
   const [isLocked, setIsLocked] = useState(false);
   const [isRevisionMode, setIsRevisionMode] = useState(isRevision);
   const [activeTab, setActiveTab] = useState<'items' | 'terms' | 'notes'>('items');
+
+  // Catalog picker state
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [snippetField, setSnippetField] = useState<'scope_of_work' | 'assumptions' | 'exclusions' | 'payment_terms' | 'warranty_notes' | null>(null);
+
+  // Handle Ctrl+K to open catalog
+  useEffect(() => {
+    if (isLocked) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCatalog(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isLocked]);
+
+  // Handle inserts from CatalogPicker
+  const handleCatalogInsert = useCallback((result: CatalogInsertResult) => {
+    if (result.type === 'line_items' && result.lineItems) {
+      const newItems = result.lineItems.map(li => ({
+        category: li.category ?? 'Materials',
+        description: li.description ?? '',
+        quantity: li.quantity ?? 1,
+        unit: li.unit ?? 'EA',
+        unit_cost: li.unit_cost ?? 0,
+        markup_percent: li.markup_percent ?? 35,
+        optional: li.optional ?? false,
+      }));
+      setLineItems(prev => [...prev, ...newItems]);
+    } else if (result.type === 'snippet' && result.snippetContent) {
+      const target = result.snippetTarget ?? snippetField;
+      const append = (current: string) => current ? current + '\n\n' + result.snippetContent! : result.snippetContent!;
+      if (target === 'scope_of_work')  setScopeOfWork(append);
+      if (target === 'assumptions')    setAssumptions(append);
+      if (target === 'exclusions')     setExclusions(append);
+      if (target === 'payment_terms')  setPaymentTerms(append);
+      if (target === 'warranty_notes') setWarrantyNotes(append);
+    }
+    setShowCatalog(false);
+    setSnippetField(null);
+  }, [snippetField]);
 
   // Load baseline project/proposal details
   useEffect(() => {
@@ -447,7 +493,15 @@ export default function ProposalEditor({
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">Detailed Scope Description</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-700 font-semibold">Detailed Scope Description</label>
+                  {!isLocked && (
+                    <button type="button" onClick={() => { setSnippetField('scope_of_work'); setShowCatalog(true); }}
+                      className="flex items-center gap-1 text-[11px] font-bold text-amber-700 hover:text-amber-800 cursor-pointer">
+                      <Bookmark className="h-3 w-3" /> Insert Snippet
+                    </button>
+                  )}
+                </div>
                 <textarea
                   disabled={isLocked}
                   value={scopeOfWork}
@@ -462,17 +516,28 @@ export default function ProposalEditor({
 
           {/* Line Items Editor Section */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 premium-shadow space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h3 className="font-bold text-slate-900 text-base">Cost Estimate Line Items</h3>
               {!isLocked && (
-                <button
-                  type="button"
-                  onClick={addLineItem}
-                  className="flex items-center space-x-1 text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 px-3 py-2 rounded-lg transition-colors cursor-pointer"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Add Line Item</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCatalog(true)}
+                    className="flex items-center gap-1.5 text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-slate-950 px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <Library className="h-3.5 w-3.5" />
+                    <span>+ Catalog</span>
+                    <span className="text-slate-700 font-normal hidden sm:inline">(⌘K)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addLineItem}
+                    className="flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-2 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Manual</span>
+                  </button>
+                </div>
               )}
             </div>
 
