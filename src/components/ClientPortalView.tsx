@@ -5,11 +5,13 @@
 
 import { useState } from 'react';
 import { db } from '@/lib/db';
+import { exportProposalPDF } from '@/lib/pdf';
 import { Proposal, Project, Client, ProposalVersion, ProposalLineItem } from '@/lib/types';
 import { 
   CheckCircle, 
   Clock, 
   Printer, 
+  Download,
   MessageSquare, 
   HardHat, 
   Calendar, 
@@ -42,6 +44,7 @@ export default function ClientPortalView({
   const [isChangeRequest, setIsChangeRequest] = useState(false);
   const [submittedComment, setSubmittedComment] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   
   // Track checked optional items locally
   const [selectedOptionalIds, setSelectedOptionalIds] = useState<Record<string, boolean>>({});
@@ -149,6 +152,19 @@ export default function ClientPortalView({
     if (typeof window !== 'undefined') window.print();
   };
 
+  const handleDownloadPDF = async () => {
+    setPdfLoading(true);
+    try {
+      const filename = `Schmidt-Construction-${proposal.proposal_number}-V${version.version_number}.pdf`;
+      await exportProposalPDF('proposal-print-sheet', filename);
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      alert('PDF export failed. Please try the Print button as a fallback.');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   const baseItems = lineItems.filter(item => !item.optional);
   const optionalItems = lineItems.filter(item => item.optional);
 
@@ -165,17 +181,27 @@ export default function ClientPortalView({
           </span>
         </div>
 
-        <button
-          onClick={handlePrint}
-          className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2.5 rounded-xl border border-slate-700 transition-colors text-xs font-semibold cursor-pointer"
-        >
-          <Printer className="h-4 w-4 text-amber-500" />
-          <span>Print / Save PDF</span>
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button
+            onClick={handleDownloadPDF}
+            disabled={pdfLoading}
+            className="flex items-center justify-center space-x-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-slate-950 px-4 py-2.5 rounded-xl transition-colors text-xs font-bold cursor-pointer"
+          >
+            <Download className="h-4 w-4" />
+            <span>{pdfLoading ? 'Generating PDF…' : 'Download PDF'}</span>
+          </button>
+          <button
+            onClick={handlePrint}
+            className="flex items-center justify-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2.5 rounded-xl border border-slate-700 transition-colors text-xs font-semibold cursor-pointer"
+          >
+            <Printer className="h-4 w-4 text-amber-500" />
+            <span>Print</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Proposal Printable Invoice Sheet */}
-      <div className="bg-white p-6 sm:p-12 rounded-2xl border border-slate-200 premium-shadow space-y-8 print-page">
+      <div id="proposal-print-sheet" className="bg-white p-6 sm:p-12 rounded-2xl border border-slate-200 premium-shadow space-y-8 print-page">
         {/* Printable Header: Contractor Branding */}
         <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-200 pb-8">
           <div>
