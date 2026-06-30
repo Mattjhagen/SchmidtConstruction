@@ -1,4 +1,4 @@
-# Schmidt Construction - Estimating & Proposals App
+# Schmidt Construction - Estimating & Proposals App v.0.0.1
 
 An Omaha-local family contractor web app for creating, revising, sending, and negotiating construction proposals with clients. Includes electronic signatures, version side-by-side comparisons, audit trail logging, and automatic expiration warnings.
 
