@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isDemoMode } from '../lib/db';
 import Image from 'next/image';
-import { Users, Database, Settings } from 'lucide-react';
+import { Award,  Users, Database, Settings } from 'lucide-react';
 
 export default function Header() {
   const pathname = usePathname();
@@ -58,7 +58,7 @@ export default function Header() {
             {/* Main Navigation */}
             <nav className="hidden md:flex space-x-1">
               {navItems.map((item) => {
-                const Icon = item.icon;
+               const Icon = item.icon;
                 const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
                 return (
                   <Link
@@ -118,7 +118,7 @@ export default function Header() {
                 isActive ? 'text-blue-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Icon className="h-5 w-5 mb-0.5" />
+          {Icon ? <Icon className="h-5 w-5 mb-0.5" /> : null}
               <span>{item.name}</span>
             </Link>
           );
