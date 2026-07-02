@@ -7,16 +7,16 @@ import { useState } from 'react';
 import { db } from '@/lib/db';
 import { exportProposalPDF } from '@/lib/pdf';
 import { Proposal, Project, Client, ProposalVersion, ProposalLineItem } from '@/lib/types';
-import { 
-  CheckCircle, 
-  Clock, 
-  Printer, 
+import Image from 'next/image';
+import {
+  CheckCircle,
+  Clock,
+  Printer,
   Download,
-  MessageSquare, 
-  HardHat, 
-  Calendar, 
-  ShieldAlert, 
-  FileText, 
+  MessageSquare,
+  Calendar,
+  ShieldAlert,
+  FileText,
   Award,
   Signature,
   MapPin
@@ -177,7 +177,7 @@ export default function ClientPortalView({
             Proposal {proposal.proposal_number} (Version {version.version_number})
           </h2>
           <span className="text-xs text-slate-400 block mt-1">
-            Status: <span className="text-amber-500 font-semibold uppercase">{proposal.status}</span>
+            Status: <span className="text-blue-400 font-semibold uppercase">{proposal.status}</span>
           </span>
         </div>
 
@@ -185,7 +185,7 @@ export default function ClientPortalView({
           <button
             onClick={handleDownloadPDF}
             disabled={pdfLoading}
-            className="flex items-center justify-center space-x-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-slate-950 px-4 py-2.5 rounded-xl transition-colors text-xs font-bold cursor-pointer"
+            className="flex items-center justify-center space-x-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white px-4 py-2.5 rounded-xl transition-colors text-xs font-bold cursor-pointer"
           >
             <Download className="h-4 w-4" />
             <span>{pdfLoading ? 'Generating PDF…' : 'Download PDF'}</span>
@@ -194,7 +194,7 @@ export default function ClientPortalView({
             onClick={handlePrint}
             className="flex items-center justify-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2.5 rounded-xl border border-slate-700 transition-colors text-xs font-semibold cursor-pointer"
           >
-            <Printer className="h-4 w-4 text-amber-500" />
+            <Printer className="h-4 w-4 text-blue-400" />
             <span>Print</span>
           </button>
         </div>
@@ -205,20 +205,14 @@ export default function ClientPortalView({
         {/* Printable Header: Contractor Branding */}
         <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-200 pb-8">
           <div>
-            <div className="flex items-center space-x-3">
-              <div className="bg-amber-500 p-2.5 rounded-xl text-slate-950">
-                <HardHat className="h-7 w-7" />
-              </div>
-              <div>
-                <h1 className="font-extrabold text-2xl sm:text-3xl text-slate-900 tracking-tight leading-none">
-                  SCHMIDT
-                </h1>
-                <span className="text-xs text-amber-600 font-bold uppercase tracking-widest block mt-1">
-                  CONSTRUCTION
-                </span>
-              </div>
-            </div>
-            
+            <Image
+              src="/logo.png"
+              alt="Schmidt Construction Inc."
+              width={220}
+              height={74}
+              className="h-14 w-auto"
+              priority
+            />
             <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-4 space-y-0.5">
               <p>50+ Years Contracting Excellence</p>
               <p>Omaha, NE | office@schmidtconstruction.com</p>
@@ -227,7 +221,7 @@ export default function ClientPortalView({
           </div>
 
           <div className="text-left sm:text-right text-xs">
-            <span className="px-3 py-1 bg-amber-50 border border-amber-200 text-amber-800 font-bold uppercase tracking-wide rounded-full block w-max sm:ml-auto mb-3">
+            <span className="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-800 font-bold uppercase tracking-wide rounded-full block w-max sm:ml-auto mb-3">
               Proposal Estimate
             </span>
             <div className="space-y-1 text-slate-600">
@@ -269,7 +263,7 @@ export default function ClientPortalView({
 
         {/* Client Message */}
         {version.client_message && (
-          <div className="bg-amber-50/40 p-5 rounded-xl border border-amber-100 text-xs leading-relaxed text-slate-700 font-medium">
+          <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100 text-xs leading-relaxed text-slate-700 font-medium">
             <p className="font-bold text-slate-900 mb-1">Message from Schmidt Construction:</p>
             "{version.client_message}"
           </div>
@@ -337,7 +331,7 @@ export default function ClientPortalView({
                     key={item.id} 
                     className={`p-4 rounded-xl border transition-all flex items-start justify-between gap-4 ${
                       isSelected 
-                        ? 'border-amber-500 bg-amber-50/10' 
+                        ? 'border-blue-500 bg-blue-50/10' 
                         : 'border-slate-200 bg-white'
                     }`}
                   >
@@ -347,7 +341,7 @@ export default function ClientPortalView({
                         disabled={proposal.status === 'Accepted'}
                         checked={isSelected}
                         onChange={() => toggleOptionalItem(item.id)}
-                        className="h-4.5 w-4.5 text-amber-500 rounded border-slate-350 focus:ring-amber-500 shrink-0 mt-0.5 no-print cursor-pointer"
+                        className="h-4.5 w-4.5 text-blue-600 rounded border-slate-350 focus:ring-blue-500 shrink-0 mt-0.5 no-print cursor-pointer"
                       />
                       <div>
                         <span className="font-bold text-slate-900 block">{item.description}</span>
@@ -472,7 +466,7 @@ export default function ClientPortalView({
           ) : (
             <div className="max-w-md bg-slate-50 p-6 rounded-xl border border-slate-200/80 space-y-4 no-print text-xs">
               <h4 className="font-extrabold text-slate-900 uppercase tracking-wide flex items-center space-x-1.5">
-                <Signature className="h-4.5 w-4.5 text-amber-600" />
+                <Signature className="h-4.5 w-4.5 text-blue-700" />
                 <span>Accept Estimate & Authorize Work</span>
               </h4>
               <p className="text-slate-600 leading-normal">
@@ -488,7 +482,7 @@ export default function ClientPortalView({
                     value={clientNameInput}
                     onChange={(e) => setClientNameInput(e.target.value)}
                     placeholder="e.g. John R. Doe"
-                    className="w-full bg-white px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:border-amber-500 text-sm font-semibold"
+                    className="w-full bg-white px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:border-blue-500 text-sm font-semibold"
                   />
                 </div>
                 
@@ -508,7 +502,7 @@ export default function ClientPortalView({
       {/* Portal Timeline comments (Feedback loop, Hidden on print) */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 premium-shadow space-y-5 no-print">
         <h3 className="font-bold text-slate-900 text-sm flex items-center space-x-2">
-          <MessageSquare className="h-4.5 w-4.5 text-amber-500" />
+          <MessageSquare className="h-4.5 w-4.5 text-blue-600" />
           <span>Negotiation & Questions Panel</span>
         </h3>
         <p className="text-xs text-slate-500">Have questions about dimensions, optional upgrades, or terms? Leave a note here to discuss with the Schmidt Construction estimator.</p>
@@ -527,7 +521,7 @@ export default function ClientPortalView({
               onChange={(e) => setCommentText(e.target.value)}
               placeholder="Type your question or request updates here..."
               rows={3}
-              className="w-full bg-white px-3 py-2.5 rounded-xl border border-slate-350 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              className="w-full bg-white px-3 py-2.5 rounded-xl border border-slate-350 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
@@ -544,7 +538,7 @@ export default function ClientPortalView({
                   setChangeRequestText('');
                 }
               }}
-              className="h-4.5 w-4.5 rounded border-slate-300 text-amber-500 focus:ring-amber-500 cursor-pointer"
+              className="h-4.5 w-4.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
             />
             <label htmlFor="isChangeRequest" className="font-bold text-slate-700 cursor-pointer">
               I am requesting specific changes/revisions to this proposal scope/price

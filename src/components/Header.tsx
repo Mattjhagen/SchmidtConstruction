@@ -6,7 +6,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isDemoMode } from '../lib/db';
-import { HardHat, Users, FileText, Database, ShieldAlert, Award } from 'lucide-react';
+import Image from 'next/image';
+import { Users, Database, Settings, Award, LucideIcon } from 'lucide-react';
 
 export default function Header() {
   const pathname = usePathname();
@@ -18,14 +19,8 @@ export default function Header() {
     return (
       <header className="w-full bg-slate-900 border-b border-slate-800 text-white py-4 px-6 no-print">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-amber-600 p-2 rounded-lg text-white">
-              <HardHat className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="font-bold text-lg tracking-wider block">SCHMIDT</span>
-              <span className="text-xs text-amber-500 font-medium uppercase tracking-widest block -mt-1">Construction</span>
-            </div>
+          <div className="flex items-center">
+            <Image src="/logo.png" alt="Schmidt Construction Inc." width={140} height={48} className="h-10 w-auto" priority />
           </div>
           <div className="flex items-center space-x-3">
             <span className="text-xs text-slate-400">Secure Client Portal</span>
@@ -36,16 +31,17 @@ export default function Header() {
     );
   }
 
-  const navItems = [
-    { name: 'Dashboard', href: '/', icon: HardHat },
-    { name: 'Clients', href: '/clients', icon: Users }
+  const navItems: { name: string; href: string; icon: LucideIcon | null }[] = [
+    { name: 'Dashboard', href: '/', icon: null },
+    { name: 'Clients', href: '/clients', icon: Users },
+    { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
   return (
     <header className="w-full bg-slate-950 text-slate-100 border-b border-slate-800 premium-shadow no-print">
       {/* Demo Banner */}
       {isDemoMode && (
-        <div className="bg-amber-600/90 text-amber-50 px-4 py-1.5 text-center text-xs font-semibold tracking-wide flex items-center justify-center space-x-2 border-b border-amber-700/50">
+        <div className="bg-blue-700/90 text-blue-50 px-4 py-1.5 text-center text-xs font-semibold tracking-wide flex items-center justify-center space-x-2 border-b border-blue-800/50">
           <Database className="h-3.5 w-3.5" />
           <span>Demo Mode: Running locally using browser LocalStorage. Changes are saved on this device.</span>
         </div>
@@ -55,24 +51,14 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center space-x-8">
-            <Link href="/" className="flex items-center space-x-3 group">
-              <div className="bg-amber-500 p-2 rounded-lg text-slate-950 group-hover:bg-amber-600 transition-colors">
-                <HardHat className="h-6 w-6" />
-              </div>
-              <div>
-                <h1 className="font-bold text-xl tracking-tight text-white m-0 leading-none">
-                  SCHMIDT
-                </h1>
-                <span className="text-xs text-amber-500 font-semibold uppercase tracking-widest block mt-0.5">
-                  CONSTRUCTION
-                </span>
-              </div>
+            <Link href="/" className="flex items-center group">
+              <Image src="/logo.png" alt="Schmidt Construction Inc." width={180} height={60} className="h-11 w-auto" priority />
             </Link>
 
             {/* Main Navigation */}
             <nav className="hidden md:flex space-x-1">
               {navItems.map((item) => {
-                const Icon = item.icon;
+                const Icon: LucideIcon | null = item.icon;
                 const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
                 return (
                   <Link
@@ -80,11 +66,11 @@ export default function Header() {
                     href={item.href}
                     className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive
-                        ? 'bg-slate-800 text-white font-semibold border-b-2 border-amber-500 rounded-b-none'
+                        ? 'bg-slate-800 text-white font-semibold border-b-2 border-blue-500 rounded-b-none'
                         : 'text-slate-400 hover:text-white hover:bg-slate-900'
                     }`}
                   >
-                    <Icon className="h-4 w-4" />
+                    {Icon && <Icon className="h-4 w-4" />}
                     <span>{item.name}</span>
                   </Link>
                 );
@@ -101,7 +87,7 @@ export default function Header() {
             
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2 text-xs bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
                 <span className="font-medium text-slate-300">Estimator Mode</span>
               </div>
               <button
@@ -122,17 +108,17 @@ export default function Header() {
       {/* Mobile Navigation Footer Bar */}
       <div className="md:hidden flex justify-around border-t border-slate-800 bg-slate-900 py-2">
         {navItems.map((item) => {
-          const Icon = item.icon;
+          const MobileIcon = item.icon;
           const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
           return (
             <Link
               key={item.name}
               href={item.href}
               className={`flex flex-col items-center space-x-1 px-3 py-1 rounded text-xs transition-colors ${
-                isActive ? 'text-amber-500 font-semibold' : 'text-slate-400 hover:text-slate-200'
+                isActive ? 'text-blue-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Icon className="h-5 w-5 mb-0.5" />
+              {MobileIcon && <MobileIcon className="h-5 w-5 mb-0.5" />}
               <span>{item.name}</span>
             </Link>
           );
