@@ -139,39 +139,73 @@ export default function ProjectDetailPage({ params }: PageProps) {
   };
 
   const [emailingProposalId, setEmailingProposalId] = useState<string | null>(null);
+  const [emailToast, setEmailToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setEmailToast({ type, message });
+    setTimeout(() => setEmailToast(null), 5000);
+  };
 
   const handleSendEmail = async (proposal: Proposal) => {
     if (!client) return;
     try {
       setEmailingProposalId(proposal.id);
-      
-      const pVersions = proposalVersions[proposal.id] || [];
-      const activeVersion = pVersions.find(v => v.id === proposal.current_version_id);
-      if (!activeVersion) return;
 
-      // 1. Update status to 'Sent'
-      await db.updateProposalStatus(
-        proposal.id,
-        'Sent',
-        'owner',
-        `Proposal sent to client email ${client.email}.`
-      );
+      // Get Supabase session token if available (for server-side auth)
+      let authToken: string | null = null;
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+        if (supabaseUrl && supabaseAnonKey) {
+          const client = createClient(supabaseUrl, supabaseAnonKey);
+          const { data } = await client.auth.getSession();
+          authToken = data.session?.access_token ?? null;
+        }
+      } catch {
+        // demo mode — no token
+      }
 
-      // 2. Trigger mailer simulation
-      const { mailer } = await import('@/lib/mailer');
-      await mailer.sendProposalEmail({
-        toEmail: client.email,
-        clientName: client.name,
-        proposalNumber: proposal.proposal_number,
-        projectTitle: activeVersion.title,
-        shareToken: proposal.share_token
+      const res = await fetch('/api/proposals/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ proposalId: proposal.id }),
       });
 
-      alert(`Simulated email link dispatched to ${client.email}! Open the Node/Next.js dev server terminal to inspect the outbox email template logs.`);
+      const json = await res.json();
+
+      if (!res.ok) {
+        // Demo mode: fall back to mailer simulation
+        if (res.status === 503) {
+          const pVersions = proposalVersions[proposal.id] || [];
+          const activeVersion = pVersions.find(v => v.id === proposal.current_version_id);
+          if (activeVersion) {
+            await db.updateProposalStatus(proposal.id, 'Sent', 'owner', `Proposal sent to client email ${client.email}.`);
+            const { mailer } = await import('@/lib/mailer');
+            await mailer.sendProposalEmail({
+              toEmail: client.email,
+              clientName: client.name,
+              proposalNumber: proposal.proposal_number,
+              projectTitle: activeVersion.title,
+              shareToken: proposal.share_token,
+            });
+            showToast('success', `Demo mode: email simulated for ${client.email}. Check terminal logs.`);
+            await loadProjectData();
+          }
+          return;
+        }
+        showToast('error', json.error ?? 'Failed to send email.');
+        return;
+      }
+
+      showToast('success', `Proposal email sent to ${json.sentTo}`);
       await loadProjectData();
     } catch (e) {
       console.error(e);
-      alert('Error sending email simulation.');
+      showToast('error', 'Unexpected error while sending email.');
     } finally {
       setEmailingProposalId(null);
     }
@@ -247,6 +281,20 @@ export default function ProjectDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
+      {/* Email toast notification */}
+      {emailToast && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center space-x-3 px-5 py-4 rounded-xl shadow-xl border text-sm font-semibold transition-all ${
+          emailToast.type === 'success'
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          {emailToast.type === 'success'
+            ? <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+            : <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />}
+          <span>{emailToast.message}</span>
+        </div>
+      )}
+
       {/* Breadcrumb Back */}
       <Link href="/clients" className="inline-flex items-center space-x-1.5 text-xs text-slate-500 hover:text-slate-900 font-semibold no-print">
         <ArrowLeft className="h-4 w-4" />
