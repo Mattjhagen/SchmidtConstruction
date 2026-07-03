@@ -249,7 +249,7 @@ export default function ProposalEditor({
     };
 
     initData();
-  }, [projectId, templateId, proposalId, viewVersionId, isRevision, isRevisionMode, router]);
+  }, [projectId, templateId, proposalId, viewVersionId, isRevision]);
 
   const addLineItem = () => {
     setLineItems([
@@ -354,22 +354,7 @@ export default function ProposalEditor({
         } else {
           const targetVerId = proposal.current_version_id;
           if (targetVerId) {
-            if (isDemoMode) {
-              const vList = getLocalStorageData<ProposalVersion[]>('schmidt_proposal_versions', []);
-              const liList = getLocalStorageData<ProposalLineItem[]>('schmidt_line_items', []);
-              const vIdx = vList.findIndex(v => v.id === targetVerId);
-              if (vIdx !== -1) vList[vIdx] = { ...vList[vIdx], ...versionData };
-              const remainingItems = liList.filter(li => li.proposal_version_id !== targetVerId);
-              const newItems = itemsForSave.map(item => ({
-                ...item,
-                id: generateUUID(),
-                proposal_version_id: targetVerId
-              }));
-              setLocalStorageData('schmidt_proposal_versions', vList);
-              setLocalStorageData('schmidt_line_items', [...remainingItems, ...newItems]);
-            } else {
-              alert('Draft successfully updated.');
-            }
+            await db.updateProposalVersion(targetVerId, versionData, itemsForSave);
           }
         }
       } else if (projectId) {
@@ -389,18 +374,6 @@ export default function ProposalEditor({
       setLoading(false);
     }
   };
-
-  function getLocalStorageData<T>(key: string, defaultVal: T): T {
-    if (typeof window === 'undefined') return defaultVal;
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : defaultVal;
-  }
-  function setLocalStorageData<T>(key: string, data: T) {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(key, JSON.stringify(data));
-  }
-  const isDemoMode = typeof window !== 'undefined' && !process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const generateUUID = () => Math.random().toString(36).substring(2, 15);
 
   if (loading) {
     return (
