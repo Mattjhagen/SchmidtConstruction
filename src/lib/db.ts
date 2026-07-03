@@ -1349,6 +1349,36 @@ export const db = {
     }
   },
 
+  async updateProposalVersion(
+    versionId: string,
+    versionData: Omit<ProposalVersion, 'id' | 'proposal_id' | 'version_number' | 'created_at'>,
+    lineItems: Omit<ProposalLineItem, 'id' | 'proposal_version_id'>[]
+  ): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      const { error: vErr } = await supabase.from('proposal_versions').update(versionData).eq('id', versionId);
+      if (vErr) throw vErr;
+
+      const { error: delErr } = await supabase.from('proposal_line_items').delete().eq('proposal_version_id', versionId);
+      if (delErr) throw delErr;
+
+      if (lineItems.length > 0) {
+        const newItems = lineItems.map(li => ({ ...li, id: generateUUID(), proposal_version_id: versionId }));
+        const { error: liErr } = await supabase.from('proposal_line_items').insert(newItems);
+        if (liErr) throw liErr;
+      }
+    } else {
+      initLocalStorageDB();
+      const vList = getLocalStorageData<ProposalVersion[]>('schmidt_proposal_versions', []);
+      const liList = getLocalStorageData<ProposalLineItem[]>('schmidt_line_items', []);
+      const vIdx = vList.findIndex(v => v.id === versionId);
+      if (vIdx !== -1) vList[vIdx] = { ...vList[vIdx], ...versionData };
+      const remaining = liList.filter(li => li.proposal_version_id !== versionId);
+      const newItems = lineItems.map(li => ({ ...li, id: generateUUID(), proposal_version_id: versionId }));
+      setLocalStorageData('schmidt_proposal_versions', vList);
+      setLocalStorageData('schmidt_line_items', [...remaining, ...newItems]);
+    }
+  },
+
   // --- LINE ITEMS ---
   async getLineItems(versionId: string): Promise<ProposalLineItem[]> {
     if (isSupabaseConfigured && supabase) {
