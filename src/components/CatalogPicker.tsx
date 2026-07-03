@@ -18,33 +18,41 @@ import {
 } from '@/lib/catalog';
 
 // ── Hydrate catalog items with their detail records ─────────────────────────
+// Two-pass: first build flat items (no assembly components), then wire components
+// from that flat list. Avoids infinite recursion when assemblies reference other items.
 function hydrateItems(): CatalogItem[] {
-  return DEMO_CATALOG_ITEMS.map(item => {
+  const flat: CatalogItem[] = DEMO_CATALOG_ITEMS.map(item => {
     const category = DEMO_CATALOG_CATEGORIES.find(c => c.id === item.category_id);
     const hydrated: CatalogItem = { ...item, category };
-
     if (item.type === 'material') {
       hydrated.material = DEMO_MATERIALS.find(m => m.catalog_item_id === item.id);
     } else if (item.type === 'labor') {
       hydrated.labor = DEMO_LABOR.find(l => l.catalog_item_id === item.id);
     } else if (item.type === 'equipment') {
       hydrated.equipment = DEMO_EQUIPMENT.find(e => e.catalog_item_id === item.id);
-    } else if (item.type === 'assembly') {
-      const asm = DEMO_ASSEMBLIES.find(a => a.catalog_item_id === item.id);
-      if (asm) {
-        hydrated.assembly = {
-          ...asm,
-          components: asm.components.map(c => ({
-            ...c,
-            component: hydrateItems().find(i => i.id === c.component_id),
-          })),
-        };
-      }
     } else if (item.type === 'snippet') {
       hydrated.snippet = DEMO_SNIPPETS.find(s => s.catalog_item_id === item.id);
     }
     return hydrated;
   });
+
+  // Second pass: wire assembly components from the already-built flat list
+  for (const item of flat) {
+    if (item.type === 'assembly') {
+      const asm = DEMO_ASSEMBLIES.find(a => a.catalog_item_id === item.id);
+      if (asm) {
+        item.assembly = {
+          ...asm,
+          components: asm.components.map(c => ({
+            ...c,
+            component: flat.find(i => i.id === c.component_id),
+          })),
+        };
+      }
+    }
+  }
+
+  return flat;
 }
 
 const ALL_ITEMS = hydrateItems();
