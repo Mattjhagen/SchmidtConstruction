@@ -19,7 +19,8 @@ import {
   FileText,
   Award,
   Signature,
-  MapPin
+  MapPin,
+  Info
 } from 'lucide-react';
 
 interface ClientPortalViewProps {
@@ -45,9 +46,17 @@ export default function ClientPortalView({
   const [submittedComment, setSubmittedComment] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
-  
-  // Track checked optional items locally
-  const [selectedOptionalIds, setSelectedOptionalIds] = useState<Record<string, boolean>>({});
+
+  // Initialize selectedOptionalIds from selected_by_default on each item
+  const [selectedOptionalIds, setSelectedOptionalIds] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    for (const item of lineItems) {
+      if (item.client_selectable) {
+        initial[item.id] = item.selected_by_default ?? true;
+      }
+    }
+    return initial;
+  });
 
   const reloadData = async () => {
     try {
@@ -65,14 +74,19 @@ export default function ClientPortalView({
     try {
       setLoading(true);
       const timestamp = new Date().toISOString();
-      
-      const selectedOptionals = lineItems
-        .filter(item => item.optional && selectedOptionalIds[item.id])
-        .map(item => item.description)
+
+      const selectedSelectables = lineItems
+        .filter(item => item.client_selectable && selectedOptionalIds[item.id])
+        .map(item => {
+          const total = item.quantity * item.unit_cost * (1 + item.markup_percent / 100);
+          return `${item.description} ($${total.toLocaleString('en-US', { minimumFractionDigits: 2 })})`;
+        })
         .join(', ');
 
       const acceptanceNotes = `Proposal accepted with E-Signature by ${clientNameInput.trim()} at ${new Date(timestamp).toLocaleString()}. ${
-        selectedOptionals ? `Included options: [${selectedOptionals}]` : 'No optional items selected.'
+        selectedSelectables
+          ? `Client-selected additions: [${selectedSelectables}]`
+          : 'No optional items selected beyond required scope.'
       }`;
 
       await db.updateProposalStatus(
@@ -97,7 +111,7 @@ export default function ClientPortalView({
     try {
       setLoading(true);
       const messageContent = commentText.trim() || 'Submitted feedback via portal.';
-      
+
       await db.createNegotiationEvent({
         proposal_id: proposal.id,
         proposal_version_id: proposal.current_version_id,
@@ -120,7 +134,7 @@ export default function ClientPortalView({
       setIsChangeRequest(false);
       setSubmittedComment(true);
       setTimeout(() => setSubmittedComment(false), 5000);
-      
+
       await reloadData();
     } catch (err) {
       console.error(err);
@@ -129,24 +143,32 @@ export default function ClientPortalView({
     }
   };
 
-  const toggleOptionalItem = (id: string) => {
+  const toggleSelectableItem = (id: string) => {
     setSelectedOptionalIds(prev => ({
       ...prev,
       [id]: !prev[id]
     }));
   };
 
+  // Base total = version.total (required items only as computed at save time)
+  // Add client_selectable items that are currently checked
   const getActiveTotal = () => {
     const baseTotal = Number(version.total);
-    const optionalsSum = lineItems
-      .filter(item => item.optional && selectedOptionalIds[item.id])
+    const selectableSum = lineItems
+      .filter(item => item.client_selectable && selectedOptionalIds[item.id])
       .reduce((sum, item) => {
-        const rawCost = item.quantity * item.unit_cost;
-        const markupFactor = 1 + (item.markup_percent / 100);
-        return sum + (rawCost * markupFactor);
+        return sum + (item.quantity * item.unit_cost * (1 + item.markup_percent / 100));
       }, 0);
-    return baseTotal + optionalsSum;
+    return baseTotal + selectableSum;
   };
+
+  const activeTotal = getActiveTotal();
+
+  // Deposit calculation
+  const depositPct = version.deposit_percentage ?? 0;
+  const depositFlat = version.deposit_amount ?? 0;
+  const depositDue = depositPct > 0 ? activeTotal * (depositPct / 100) : depositFlat;
+  const balanceDue = activeTotal - depositDue;
 
   const handlePrint = () => {
     if (typeof window !== 'undefined') window.print();
@@ -165,8 +187,19 @@ export default function ClientPortalView({
     }
   };
 
-  const baseItems = lineItems.filter(item => !item.optional);
-  const optionalItems = lineItems.filter(item => item.optional);
+  // Required items: line_item_type === 'required', or fall back to !optional
+  const baseItems = lineItems.filter(item =>
+    item.line_item_type ? item.line_item_type === 'required' : !item.optional
+  );
+
+  // Client-selectable items: flagged as client_selectable, or fall back to item.optional
+  const selectableItems = lineItems.filter(item =>
+    item.client_selectable ?? item.optional
+  );
+
+  const hasSelectableItems = selectableItems.length > 0;
+  const hasSelectedAny = selectableItems.some(i => selectedOptionalIds[i.id]);
+  const selectedAdditionsTotal = activeTotal - Number(version.total);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-16">
@@ -269,6 +302,17 @@ export default function ClientPortalView({
           </div>
         )}
 
+        {/* Please Note / Client Remarks block */}
+        {version.remarks && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 text-xs text-blue-900 leading-relaxed">
+            <div className="flex items-center space-x-2 mb-2">
+              <Info className="h-4 w-4 text-blue-600 shrink-0" />
+              <span className="font-bold text-blue-900 uppercase tracking-wide text-[10px]">Please Note</span>
+            </div>
+            <p className="whitespace-pre-wrap leading-relaxed">{version.remarks}</p>
+          </div>
+        )}
+
         {/* Scope of Work */}
         <div className="space-y-3">
           <h3 className="font-bold text-slate-900 text-sm border-b border-slate-200 pb-2 uppercase tracking-wide">Scope of Work</h3>
@@ -280,7 +324,7 @@ export default function ClientPortalView({
         {/* Line Items Table */}
         <div className="space-y-4">
           <h3 className="font-bold text-slate-900 text-sm border-b border-slate-200 pb-2 uppercase tracking-wide">Detailed Estimate Cost Breakdown</h3>
-          
+
           <div className="overflow-hidden border border-slate-200 rounded-xl">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -293,10 +337,7 @@ export default function ClientPortalView({
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {baseItems.map((item) => {
-                  const rawCost = item.quantity * item.unit_cost;
-                  const markupFactor = 1 + (item.markup_percent / 100);
-                  const totalCost = rawCost * markupFactor;
-
+                  const totalCost = item.quantity * item.unit_cost * (1 + item.markup_percent / 100);
                   return (
                     <tr key={item.id}>
                       <td className="py-3 px-4">{item.description}</td>
@@ -313,25 +354,29 @@ export default function ClientPortalView({
           </div>
         </div>
 
-        {/* Optional Add-ons List */}
-        {optionalItems.length > 0 && (
+        {/* Client-Selectable Items */}
+        {hasSelectableItems && (
           <div className="space-y-4 avoid-break">
-            <h3 className="font-bold text-slate-900 text-sm border-b border-slate-200 pb-2 uppercase tracking-wide">Optional Upgrades / Add-on Options</h3>
-            <p className="text-xs text-slate-500">Check the items you would like to include in this contract. The total price below will adjust automatically.</p>
-            
+            <h3 className="font-bold text-slate-900 text-sm border-b border-slate-200 pb-2 uppercase tracking-wide">Optional / Phase / Alternate Work Items</h3>
+            <p className="text-xs text-slate-500">
+              Check the items you would like to include in this contract. The total price below updates automatically.
+              Items pre-checked below are recommended additions.
+            </p>
+
             <div className="space-y-3.5">
-              {optionalItems.map((item) => {
-                const rawCost = item.quantity * item.unit_cost;
-                const markupFactor = 1 + (item.markup_percent / 100);
-                const totalCost = rawCost * markupFactor;
+              {selectableItems.map((item) => {
+                const totalCost = item.quantity * item.unit_cost * (1 + item.markup_percent / 100);
                 const isSelected = !!selectedOptionalIds[item.id];
+                const typeLabel = item.line_item_type && item.line_item_type !== 'required'
+                  ? item.line_item_type.charAt(0).toUpperCase() + item.line_item_type.slice(1)
+                  : 'Optional';
 
                 return (
-                  <div 
-                    key={item.id} 
+                  <div
+                    key={item.id}
                     className={`p-4 rounded-xl border transition-all flex items-start justify-between gap-4 ${
-                      isSelected 
-                        ? 'border-blue-500 bg-blue-50/10' 
+                      isSelected
+                        ? 'border-blue-500 bg-blue-50/10'
                         : 'border-slate-200 bg-white'
                     }`}
                   >
@@ -340,12 +385,17 @@ export default function ClientPortalView({
                         type="checkbox"
                         disabled={proposal.status === 'Accepted'}
                         checked={isSelected}
-                        onChange={() => toggleOptionalItem(item.id)}
+                        onChange={() => toggleSelectableItem(item.id)}
                         className="h-4.5 w-4.5 text-blue-600 rounded border-slate-350 focus:ring-blue-500 shrink-0 mt-0.5 no-print cursor-pointer"
                       />
                       <div>
-                        <span className="font-bold text-slate-900 block">{item.description}</span>
-                        <span className="text-[10px] text-slate-500 block mt-0.5">Quantity: {Number(item.quantity)} {item.unit}</span>
+                        <div className="flex items-center space-x-2 mb-0.5">
+                          <span className="font-bold text-slate-900">{item.description}</span>
+                          <span className="px-1.5 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-600 rounded uppercase tracking-wide">
+                            {typeLabel}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 block">Quantity: {Number(item.quantity)} {item.unit}</span>
                       </div>
                     </div>
                     <span className="text-sm font-bold text-slate-900 whitespace-nowrap">
@@ -384,7 +434,7 @@ export default function ClientPortalView({
           )}
           {version.payment_terms && (
             <div className="space-y-2">
-              <span className="font-bold text-slate-900 uppercase tracking-wider block border-b border-slate-200 pb-1">Payment Schedule & Schedule Terms</span>
+              <span className="font-bold text-slate-900 uppercase tracking-wider block border-b border-slate-200 pb-1">Payment Schedule & Terms</span>
               <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{version.payment_terms}</p>
             </div>
           )}
@@ -400,12 +450,12 @@ export default function ClientPortalView({
 
         {/* Price Calculations Column */}
         <div className="border-t-2 border-slate-900 pt-6 flex flex-col items-end gap-3 text-xs font-semibold avoid-break">
-          <div className="w-64 space-y-2">
+          <div className="w-72 space-y-2">
             <div className="flex justify-between text-slate-500">
               <span>Base Estimate Subtotal</span>
               <span>${Number(version.subtotal).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
-            
+
             {Number(version.tax) > 0 && (
               <div className="flex justify-between text-slate-500">
                 <span>Fees / Permit Cost Additions</span>
@@ -420,21 +470,35 @@ export default function ClientPortalView({
               </div>
             )}
 
-            {optionalItems.some(i => selectedOptionalIds[i.id]) && (
-              <div className="flex justify-between text-slate-500 border-t border-dashed border-slate-200 pt-2">
-                <span>Selected Upgrades</span>
-                <span>
-                  +${(getActiveTotal() - Number(version.total)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </span>
+            {hasSelectedAny && selectedAdditionsTotal > 0 && (
+              <div className="flex justify-between text-blue-700 border-t border-dashed border-slate-200 pt-2">
+                <span>Selected Additions</span>
+                <span>+${selectedAdditionsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
               </div>
             )}
 
             <div className="flex justify-between items-baseline pt-2 border-t border-slate-900 text-sm">
               <span className="font-bold text-slate-900">Total Contract Value</span>
               <span className="text-xl font-extrabold text-slate-950">
-                ${getActiveTotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${activeTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
+
+            {/* Deposit / Balance breakdown */}
+            {(depositPct > 0 || depositFlat > 0) && (
+              <div className="border-t border-slate-200 pt-2 space-y-1.5 text-slate-600">
+                <div className="flex justify-between">
+                  <span>Deposit Due{depositPct > 0 ? ` (${depositPct}%)` : ''}</span>
+                  <span className="font-bold text-slate-900">
+                    ${depositDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>{version.balance_due_text || 'Balance due upon completion'}</span>
+                  <span className="font-semibold">${balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -447,7 +511,7 @@ export default function ClientPortalView({
               <p className="text-slate-600 mt-1 max-w-sm">
                 This contract is signed. Mobilization prep will commence per the outlined schedule.
               </p>
-              
+
               <div className="mt-4 pt-4 border-t border-green-200/50 w-full max-w-xs text-left font-semibold text-slate-700 space-y-1">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Signatory:</span>
@@ -459,7 +523,7 @@ export default function ClientPortalView({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">IP / Secure Token:</span>
-                  <span className="font-mono text-[9px] text-slate-400">{proposal.share_token.substring(0,18)}</span>
+                  <span className="font-mono text-[9px] text-slate-400">{proposal.share_token.substring(0, 18)}</span>
                 </div>
               </div>
             </div>
@@ -469,9 +533,17 @@ export default function ClientPortalView({
                 <Signature className="h-4.5 w-4.5 text-blue-700" />
                 <span>Accept Estimate & Authorize Work</span>
               </h4>
-              <p className="text-slate-600 leading-normal">
-                By entering your name below and clicking Accept, you authorize Schmidt Construction to execute this scope of work under the outlined timeline, pricing, and payment terms.
-              </p>
+
+              {/* Acceptance language from the proposal */}
+              {version.acceptance_language ? (
+                <p className="text-slate-700 leading-normal bg-blue-50/60 border border-blue-100 p-3 rounded-lg">
+                  {version.acceptance_language}
+                </p>
+              ) : (
+                <p className="text-slate-600 leading-normal">
+                  By entering your name below and clicking Accept, you authorize Schmidt Construction to execute this scope of work under the outlined timeline, pricing, and payment terms.
+                </p>
+              )}
 
               <form onSubmit={handleAcceptProposal} className="space-y-3">
                 <div>
@@ -485,7 +557,7 @@ export default function ClientPortalView({
                     className="w-full bg-white px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:border-blue-500 text-sm font-semibold"
                   />
                 </div>
-                
+
                 <button
                   type="submit"
                   disabled={!clientNameInput.trim() || loading}

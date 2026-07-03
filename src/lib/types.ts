@@ -87,7 +87,15 @@ export interface ProposalVersion {
   internal_notes: string;
   client_message: string;
   created_at: string;
+  // Phase 4 additions
+  remarks?: string;
+  deposit_percentage?: number;
+  deposit_amount?: number;
+  balance_due_text?: string;
+  acceptance_language?: string;
 }
+
+export type LineItemType = 'required' | 'optional' | 'phase' | 'alternate';
 
 export interface ProposalLineItem {
   id: string;
@@ -100,6 +108,11 @@ export interface ProposalLineItem {
   markup_percent: number;
   line_total: number;
   optional: boolean;
+  // Phase 4 additions
+  line_item_type?: LineItemType;
+  client_selectable?: boolean;
+  selected_by_default?: boolean;
+  sort_order?: number;
 }
 
 export type SenderType = 'owner' | 'client' | 'system';
@@ -266,7 +279,7 @@ export interface MeasurementTemplate {
 export interface CatalogInsertResult {
   type: 'line_items' | 'snippet';
   // For line_items (materials, labor, equipment, assemblies)
-  lineItems?: Omit<ProposalLineItem, 'id' | 'proposal_version_id'>[];
+  lineItems?: Omit<ProposalLineItem, 'id' | 'proposal_version_id' | 'optional'>[];
   // For snippets
   snippetContent?: string;
   snippetTarget?: SnippetDetail['insert_target'];

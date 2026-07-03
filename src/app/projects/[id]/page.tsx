@@ -8,18 +8,18 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/lib/db';
 import { Project, Client, Proposal, ProposalVersion, NegotiationEvent, ProposalStatus } from '@/lib/types';
-import { 
-  Briefcase, 
-  User, 
-  MapPin, 
-  Calendar, 
-  FileText, 
-  History, 
-  MessageSquare, 
-  Send, 
-  CheckCircle, 
-  Copy, 
-  Check, 
+import {
+  Briefcase,
+  User,
+  MapPin,
+  Calendar,
+  FileText,
+  History,
+  MessageSquare,
+  Send,
+  CheckCircle,
+  Copy,
+  Check,
   ArrowLeft,
   ChevronDown,
   Layers,
@@ -29,7 +29,8 @@ import {
   AlertCircle,
   Plus,
   Mail,
-  ShieldAlert
+  ShieldAlert,
+  FolderOpen
 } from 'lucide-react';
 
 interface PageProps {
@@ -633,6 +634,27 @@ export default function ProjectDetailPage({ params }: PageProps) {
                 })}
               </div>
             )}
+          </div>
+          {/* Project Documentation Placeholder */}
+          <div className="bg-white rounded-2xl border border-slate-200 premium-shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center space-x-2">
+                <FolderOpen className="h-4.5 w-4.5 text-slate-400" />
+                <span>Project Documentation</span>
+              </h3>
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-500 rounded-full uppercase tracking-wide">Coming Soon</span>
+            </div>
+            <div className="px-6 py-5 text-xs text-slate-500 space-y-1.5 leading-relaxed">
+              <p className="font-semibold text-slate-700">Planned: before &amp; after photos, existing conditions, permits, and liability documentation.</p>
+              <ul className="list-disc list-inside space-y-1 text-slate-400 pl-1">
+                <li>Before-work site photos</li>
+                <li>After-work completion photos</li>
+                <li>Existing conditions documentation</li>
+                <li>Permits and inspection records</li>
+                <li>Liability / insurance documentation</li>
+              </ul>
+              <p className="text-[11px] text-slate-400 pt-1">File uploads will be available in a future update.</p>
+            </div>
           </div>
         </div>
 
