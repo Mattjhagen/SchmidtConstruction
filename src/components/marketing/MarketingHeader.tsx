@@ -33,6 +33,14 @@ function DropdownMenu({ label, items, mobile, onClose }: {
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleClose = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 120);
+  };
+  const cancelClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  };
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -75,8 +83,8 @@ function DropdownMenu({ label, items, mobile, onClose }: {
   return (
     <div ref={ref} className="relative">
       <button
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
+        onMouseEnter={() => { cancelClose(); setOpen(true); }}
+        onMouseLeave={scheduleClose}
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors"
       >
@@ -87,8 +95,8 @@ function DropdownMenu({ label, items, mobile, onClose }: {
       </button>
       {open && (
         <div
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
           className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50"
         >
           {items.map(item => (
