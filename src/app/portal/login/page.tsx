@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { getSupabaseBrowser } from '@/lib/supabaseClient';
@@ -8,6 +8,14 @@ import { getSupabaseBrowser } from '@/lib/supabaseClient';
 type Mode = 'signin' | 'signup' | 'forgot';
 
 export default function ClientLoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get('next') ?? '/portal/dashboard';
