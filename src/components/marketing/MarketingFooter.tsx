@@ -35,6 +35,7 @@ export default function MarketingFooter() {
               <li><Link href="/portfolio" className="hover:text-white transition-colors">Portfolio</Link></li>
               <li><Link href="/service-areas" className="hover:text-white transition-colors">Service Areas</Link></li>
               <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link href="/sitemap.xml" className="hover:text-white transition-colors">Sitemap</Link></li>
             </ul>
           </div>
         </div>
