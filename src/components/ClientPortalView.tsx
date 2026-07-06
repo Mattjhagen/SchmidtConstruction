@@ -248,8 +248,8 @@ export default function ClientPortalView({
             />
             <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-4 space-y-0.5">
               <p>50+ Years Contracting Excellence</p>
-              <p>Omaha, NE | office@schmidtconstruction.com</p>
-              <p>Phone: (402) 555-0199</p>
+              <p>Omaha, NE | Mikiel@schmidt-construction.com</p>
+              <p>Phone: (402) 320-2600</p>
             </div>
           </div>
 

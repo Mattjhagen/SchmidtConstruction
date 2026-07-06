@@ -106,9 +106,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Build portal URL — internal_notes are never included here
-    const siteUrl =
-      process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    const portalUrl = `${siteUrl}/portal/${proposal.share_token}`;
+    const portalBase =
+      process.env.NEXT_PUBLIC_PORTAL_URL ??
+      process.env.NEXT_PUBLIC_SITE_URL ??
+      "http://localhost:3000";
+    const portalUrl = `${portalBase}/portal/${proposal.share_token}`;
 
     // Send email via Resend (server-side only — RESEND_API_KEY never reaches browser)
     const { error: sendError } = await sendProposalEmail({

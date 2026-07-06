@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const ADMIN_SUBDOMAIN = 'login';
-const PUBLIC_PATHS = ['/login', '/favicon.ico', '/_next', '/api', '/robots.txt', '/sitemap.xml', '/llms.txt'];
+const PUBLIC_PATHS = ['/login', '/portal', '/favicon.ico', '/_next', '/api', '/robots.txt', '/sitemap.xml', '/llms.txt'];
 
 // Domains that should 301 redirect to the main site
 const REDIRECT_DOMAINS = ['walls2.com', 'www.walls2.com'];
