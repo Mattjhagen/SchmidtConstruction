@@ -25,7 +25,7 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
       await auth.login(email, password);
-      router.push('/');
+      router.push('/dashboard');
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'Invalid email or password. Please try again.');
@@ -39,7 +39,7 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
       await auth.login('estimator@schmidtconstruction.com');
-      router.push('/');
+      router.push('/dashboard');
     } catch (err: any) {
       console.error(err);
       setError('Error triggering demo session bypass.');

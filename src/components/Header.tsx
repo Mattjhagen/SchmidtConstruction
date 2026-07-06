@@ -32,7 +32,7 @@ export default function Header() {
   }
 
   const navItems: { name: string; href: string; icon: LucideIcon | null }[] = [
-    { name: 'Dashboard', href: '/', icon: null },
+    { name: 'Dashboard', href: '/dashboard', icon: null },
     { name: 'Clients', href: '/clients', icon: Users },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
@@ -51,7 +51,7 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center space-x-8">
-            <Link href="/" className="flex items-center group">
+            <Link href="/dashboard" className="flex items-center group">
               <Image src="/logo.png" alt="Schmidt Construction Inc." width={180} height={60} className="h-11 w-auto" priority />
             </Link>
 
@@ -59,7 +59,7 @@ export default function Header() {
             <nav className="hidden md:flex space-x-1">
               {navItems.map((item) => {
                 const Icon: LucideIcon | null = item.icon;
-                const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+                const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
                 return (
                   <Link
                     key={item.name}
@@ -94,7 +94,7 @@ export default function Header() {
                 onClick={async () => {
                   const { auth } = await import('@/lib/auth');
                   await auth.logout();
-                  window.location.reload();
+                  window.location.href = '/login';
                 }}
                 className="text-xs font-semibold text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
               >
@@ -109,7 +109,7 @@ export default function Header() {
       <div className="md:hidden flex justify-around border-t border-slate-800 bg-slate-900 py-2">
         {navItems.map((item) => {
           const MobileIcon = item.icon;
-          const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
           return (
             <Link
               key={item.name}
