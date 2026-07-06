@@ -48,7 +48,7 @@ export async function sendContactForm(formData: FormData): Promise<{ success: bo
 
   try {
     const { error } = await getResend().emails.send({
-      from: 'Schmidt Construction Website <estimates@schmidt-construction.com>',
+      from: 'Schmidt Construction Website <Mikiel@schmidt-construction.com>',
       to: 'mikiel@schmidt-construction.com',
       replyTo: phone ? undefined : undefined,
       subject: `New Estimate Request from ${name}${service ? ` — ${service}` : ''}`,

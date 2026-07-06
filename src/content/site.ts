@@ -10,7 +10,7 @@ export const site = {
 
   phone: '(402) 320-2600',
   phoneHref: 'tel:+14023202600',
-  email: 'estimates@schmidt-construction.com',
+  email: 'Mikiel@schmidt-construction.com',
   address: {
     street: 'Omaha',
     city: 'Omaha',
