@@ -68,7 +68,7 @@ function LoginForm() {
       <div className="w-full max-w-md bg-slate-900/90 text-white rounded-2xl border border-slate-800 p-8 premium-shadow relative z-10 space-y-6">
         {/* Brand Banner */}
         <div className="flex flex-col items-center space-y-4">
-          <Image src="/logo.png" alt="Schmidt Construction Inc." width={220} height={74} className="h-16 w-auto" priority />
+          <Image src="/icon.png" alt="Schmidt Construction" width={96} height={96} className="h-24 w-24 rounded-2xl" priority />
           <span className="text-xs text-blue-400 font-semibold uppercase tracking-widest">
             Estimating &amp; Proposals
           </span>
@@ -112,7 +112,7 @@ function LoginForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="estimator@schmidtconstruction.com"
+                placeholder="admin@schmidt-construction.com"
                 className="w-full bg-slate-950/50 border border-slate-800 text-white rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-xs font-medium"
               />
             </div>
