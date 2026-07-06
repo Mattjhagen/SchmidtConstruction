@@ -3,19 +3,30 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { auth } from '../../lib/auth';
 import { isDemoMode } from '../../lib/db';
 import { Mail, AlertTriangle, KeyRound } from 'lucide-react';
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const redirect = searchParams.get('next') || '/dashboard';
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +36,7 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
       await auth.login(email, password);
-      router.push('/dashboard');
+      router.push(redirect);
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'Invalid email or password. Please try again.');
@@ -39,7 +50,7 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
       await auth.login('estimator@schmidtconstruction.com');
-      router.push('/dashboard');
+      router.push(redirect);
     } catch (err: any) {
       console.error(err);
       setError('Error triggering demo session bypass.');

@@ -15,6 +15,16 @@ export interface SessionUser {
   name: string;
 }
 
+function setAuthCookie() {
+  if (typeof document === 'undefined') return;
+  document.cookie = 'schmidt_admin=1; path=/; max-age=86400; SameSite=Lax';
+}
+
+function clearAuthCookie() {
+  if (typeof document === 'undefined') return;
+  document.cookie = 'schmidt_admin=; path=/; max-age=0; SameSite=Lax';
+}
+
 export const auth = {
   // Check if user is currently logged in
   getSessionUser(): SessionUser | null {
@@ -56,6 +66,7 @@ export const auth = {
       };
 
       localStorage.setItem('schmidt_auth_session', JSON.stringify(user));
+      setAuthCookie();
       return user;
     } else {
       // Demo Mode Login
@@ -68,6 +79,7 @@ export const auth = {
       };
 
       localStorage.setItem('schmidt_auth_session', JSON.stringify(user));
+      setAuthCookie();
       return user;
     }
   },
@@ -78,5 +90,6 @@ export const auth = {
       await supabase.auth.signOut();
     }
     localStorage.removeItem('schmidt_auth_session');
+    clearAuthCookie();
   }
 };
