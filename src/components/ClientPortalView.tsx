@@ -571,6 +571,18 @@ export default function ClientPortalView({
         </div>
       </div>
 
+      {/* Account CTA (Hidden on print) */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 no-print text-center space-y-2">
+        <p className="text-sm font-bold text-gray-900">Save access to all your proposals</p>
+        <p className="text-xs text-gray-600">Create a free account to view, sign, and track every proposal from Schmidt Construction in one place.</p>
+        <a
+          href="/portal/login?next=/portal/dashboard"
+          className="inline-block mt-2 bg-yellow-500 hover:bg-yellow-600 text-white font-extrabold px-6 py-2.5 rounded-xl text-sm transition-colors"
+        >
+          Create Account / Sign In
+        </a>
+      </div>
+
       {/* Portal Timeline comments (Feedback loop, Hidden on print) */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 premium-shadow space-y-5 no-print">
         <h3 className="font-bold text-slate-900 text-sm flex items-center space-x-2">
