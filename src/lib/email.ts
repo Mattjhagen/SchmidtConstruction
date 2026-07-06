@@ -195,7 +195,7 @@ export async function sendProposalEmail({
   return await resend.emails.send({
     from:
       process.env.PROPOSAL_FROM_EMAIL ??
-      "Schmidt Construction <onboarding@resend.dev>",
+      "Schmidt Construction <estimates@schmidt-construction.com>",
     to: recipient,
     subject,
     html: htmlWithBanner,

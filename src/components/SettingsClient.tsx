@@ -149,13 +149,13 @@ export default function SettingsClient({ emailOverrideTo }: Props) {
 
               <span className="text-slate-500 font-medium">From Address</span>
               <span className="font-mono text-xs font-semibold text-slate-800">
-                proposals@schmidt.pacmacmobile.com
+                estimates@schmidt-construction.com
               </span>
 
               <span className="text-slate-500 font-medium">Verified Domain</span>
               <span className="font-semibold text-green-700 flex items-center space-x-1.5">
                 <CheckCircle className="h-3.5 w-3.5" />
-                <span>schmidt.pacmacmobile.com</span>
+                <span>schmidt-construction.com</span>
               </span>
 
               <span className="text-slate-500 font-medium">Reply-To</span>
