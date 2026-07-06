@@ -116,7 +116,7 @@ export const services: Service[] = [
       'Erosion control blankets and ground cover',
     ],
     icon: '🌊',
-    image: '/images/drainage.jpg',
+    image: '/images/retaining-wall2.jpg',
     seoTitle: 'Drainage Solutions Omaha NE | French Drain Installation | Schmidt Construction',
     seoDescription: 'French drain and drainage solutions in Omaha, NE. Protect your foundation and landscaping from water damage. Family-owned contractor. Free estimates.',
     relatedSlugs: ['retaining-wall-installation', 'concrete-contractor'],
