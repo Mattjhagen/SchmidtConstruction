@@ -17,6 +17,14 @@ export async function uploadMarketingImage(formData: FormData): Promise<{ url: s
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
+  // Create the bucket if it doesn't exist yet
+  const { data: buckets } = await supabase.storage.listBuckets();
+  const exists = buckets?.some(b => b.name === BUCKET);
+  if (!exists) {
+    const { error: createErr } = await supabase.storage.createBucket(BUCKET, { public: true });
+    if (createErr) return { error: `Could not create storage bucket: ${createErr.message}` };
+  }
+
   const ext = file.name.split('.').pop() ?? 'jpg';
   const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
