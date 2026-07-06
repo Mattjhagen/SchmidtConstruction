@@ -1,15 +1,28 @@
 import Link from 'next/link';
 import { site } from '@/content/site';
+import HeroSlideshow from './HeroSlideshow';
 
-export default function Hero() {
+interface Props {
+  slideshowImages?: string[];
+}
+
+export default function Hero({ slideshowImages = [] }: Props) {
   return (
-    <section className="relative bg-gray-900 text-white overflow-hidden">
-      <div
-        className="absolute inset-0 bg-cover bg-center opacity-30"
-        style={{ backgroundImage: "url('/images/hero-bg.jpg')" }}
-        aria-hidden="true"
-      />
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
+    <section className="relative bg-gray-900 text-white overflow-hidden min-h-[520px] flex items-center">
+      {slideshowImages.length > 0 ? (
+        <HeroSlideshow images={slideshowImages} />
+      ) : (
+        <>
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-30"
+            style={{ backgroundImage: "url('/images/retaining-wall.jpg')" }}
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-gray-900/40" aria-hidden="true" />
+        </>
+      )}
+
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
         <div className="max-w-2xl">
           <p className="text-yellow-400 text-sm font-semibold tracking-widest uppercase mb-3">
             Omaha, NE · Est. {site.founded}

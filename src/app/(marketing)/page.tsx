@@ -6,16 +6,29 @@ import CTASection from '@/components/marketing/CTASection';
 import { services } from '@/content/services';
 import { featuredTestimonials } from '@/content/testimonials';
 import { site } from '@/content/site';
+import { siteContentDb } from '@/lib/db';
+import { portfolioItems as fallbackItems } from '@/content/portfolio';
+
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: site.seo.homeTitle,
   description: site.seo.homeDescription,
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const dbItems = await siteContentDb.getPortfolioItems();
+  const items = dbItems.length > 0 ? dbItems : fallbackItems.map(p => ({
+    image_url: p.image,
+    id: p.id,
+  }));
+  const slideshowImages = items
+    .map(p => p.image_url)
+    .filter(Boolean) as string[];
+
   return (
     <>
-      <Hero />
+      <Hero slideshowImages={slideshowImages} />
 
       {/* Services */}
       <section id="services" className="py-20 bg-gray-50">
@@ -58,8 +71,9 @@ export default function HomePage() {
                 ))}
               </ul>
             </div>
-            <div className="bg-gray-100 rounded-2xl h-72 flex items-center justify-center text-6xl">
-              🧱
+            <div className="rounded-2xl h-72 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/assets/stone-retaining-wall-commercial.jpg" alt="Schmidt Construction retaining wall project" className="w-full h-full object-cover" />
             </div>
           </div>
         </div>
