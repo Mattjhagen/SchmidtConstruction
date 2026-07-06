@@ -8,6 +8,7 @@ import { featuredTestimonials } from '@/content/testimonials';
 import { site } from '@/content/site';
 import { siteContentDb } from '@/lib/db';
 import { portfolioItems as fallbackItems } from '@/content/portfolio';
+import AdminEditHint from '@/components/marketing/AdminEditHint';
 
 export const revalidate = 3600;
 
@@ -17,7 +18,10 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const dbItems = await siteContentDb.getPortfolioItems();
+  const [dbItems, serviceOverrides] = await Promise.all([
+    siteContentDb.getPortfolioItems(),
+    siteContentDb.getServiceOverrides(),
+  ]);
   const items = dbItems.length > 0 ? dbItems : fallbackItems.map(p => ({
     image_url: p.image,
     id: p.id,
@@ -25,6 +29,11 @@ export default async function HomePage() {
   const slideshowImages = items
     .map(p => p.image_url)
     .filter(Boolean) as string[];
+
+  // Build slug → override image URL map for the services grid
+  const serviceImageMap = Object.fromEntries(
+    serviceOverrides.filter(o => o.image_url).map(o => [o.service_slug, o.image_url as string])
+  );
 
   return (
     <>
@@ -34,13 +43,22 @@ export default async function HomePage() {
       <section id="services" className="py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-3">Our Services</h2>
+            <h2 className="text-3xl font-extrabold text-gray-900 mb-3 inline-flex items-center flex-wrap justify-center gap-2">
+                Our Services
+                <AdminEditHint href="/admin/services" label="Edit service photos" />
+              </h2>
             <p className="text-gray-600 max-w-xl mx-auto">
               From retaining walls and concrete to kitchen and bathroom remodeling, Schmidt Construction delivers quality craftsmanship on every project.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {services.map((s) => <ServiceCard key={s.id} service={s} />)}
+            {services.map((s) => (
+              <ServiceCard
+                key={s.id}
+                service={s}
+                imageUrl={serviceImageMap[s.slug] || s.image}
+              />
+            ))}
           </div>
         </div>
       </section>
