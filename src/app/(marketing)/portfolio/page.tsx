@@ -41,7 +41,7 @@ export default async function PortfolioPage() {
             {items.map((item) => (
               <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="bg-gray-100 h-48 flex items-center justify-center overflow-hidden">
-                  {item.image_url && !item.image_url.startsWith('/images/') ? (
+                  {item.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
                   ) : (

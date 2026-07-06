@@ -8,8 +8,8 @@ export const site = {
   shortTagline: 'Omaha\'s Trusted Contractor Since 1976',
   description: 'Family-owned general contractor serving Omaha, Nebraska and surrounding areas since 1976. Specializing in retaining walls, concrete, drainage, and remodeling. Licensed, insured, and dedicated to premium quality.',
 
-  phone: '(402) 555-0100',
-  phoneHref: 'tel:+14025550100',
+  phone: '(402) 320-2600',
+  phoneHref: 'tel:+14023202600',
   email: 'estimates@schmidt-construction.com',
   address: {
     street: 'Omaha',
