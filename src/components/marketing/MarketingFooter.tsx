@@ -39,9 +39,17 @@ export default function MarketingFooter() {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-10 pt-6 text-center text-xs text-gray-500">
-          <p>© {new Date().getFullYear()} {site.legalName}. All rights reserved. Licensed & Insured.</p>
-          <p className="mt-1">Serving {site.serviceArea}.</p>
+        <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
+          <div className="text-center sm:text-left">
+            <p>© {new Date().getFullYear()} {site.legalName}. All rights reserved. Licensed & Insured.</p>
+            <p className="mt-1">Serving {site.serviceArea}.</p>
+          </div>
+          <a
+            href="https://login.schmidt-construction.com"
+            className="text-gray-600 hover:text-gray-400 transition-colors border border-gray-700 hover:border-gray-600 rounded px-3 py-1.5 whitespace-nowrap"
+          >
+            Admin Portal
+          </a>
         </div>
       </div>
     </footer>
