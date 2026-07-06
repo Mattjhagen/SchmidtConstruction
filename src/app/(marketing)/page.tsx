@@ -32,7 +32,7 @@ export default async function HomePage() {
 
   // Build slug → override image URL map for the services grid
   const serviceImageMap = Object.fromEntries(
-    serviceOverrides.filter(o => o.image_url).map(o => [o.service_slug, o.image_url as string])
+    serviceOverrides.filter(o => o.image_url).map(o => [o.slug, o.image_url as string])
   );
 
   return (
