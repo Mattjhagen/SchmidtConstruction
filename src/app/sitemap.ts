@@ -11,6 +11,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/service-areas`, priority: 0.7 },
     { url: `${base}/contact`, priority: 0.9 },
     { url: `${base}/hiring`, priority: 0.6 },
+    { url: `${base}/terms`, priority: 0.3 },
+    { url: `${base}/privacy`, priority: 0.3 },
   ];
 
   const servicePages = services.map((s) => ({

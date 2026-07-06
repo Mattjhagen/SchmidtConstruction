@@ -36,6 +36,8 @@ export default function MarketingFooter() {
               <li><Link href="/service-areas" className="hover:text-white transition-colors">Service Areas</Link></li>
               <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
               <li><Link href="/sitemap.xml" className="hover:text-white transition-colors">Sitemap</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
             </ul>
           </div>
         </div>
