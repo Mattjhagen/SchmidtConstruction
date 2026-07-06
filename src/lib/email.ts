@@ -1,6 +1,8 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 export interface SendProposalEmailParams {
   to: string;
@@ -192,7 +194,7 @@ export async function sendProposalEmail({
       )
     : html;
 
-  return await resend.emails.send({
+  return await getResend().emails.send({
     from:
       process.env.PROPOSAL_FROM_EMAIL ??
       "Schmidt Construction <estimates@schmidt-construction.com>",
