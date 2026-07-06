@@ -1563,3 +1563,121 @@ export const db = {
     return this.sanitizeProposalVersionForClient(version);
   }
 };
+
+// ---------------------------------------------------------------------------
+// Site Content (portfolio, site_config, service_overrides)
+// ---------------------------------------------------------------------------
+
+export interface PortfolioItem {
+  id: string;
+  title: string;
+  location: string;
+  service_slug: string;
+  service_name: string;
+  description: string;
+  image_url: string;
+  featured: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SiteConfigMap {
+  phone: string;
+  phone_href: string;
+  email: string;
+  address: string;
+  hours_weekday: string;
+  hours_weekend: string;
+  about_text: string;
+  tagline: string;
+  [key: string]: string;
+}
+
+export interface ServiceOverride {
+  slug: string;
+  long_description?: string;
+  image_url?: string;
+  updated_at: string;
+}
+
+export const siteContentDb = {
+  // Portfolio
+  async getPortfolioItems(): Promise<PortfolioItem[]> {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('portfolio_items')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) { console.error('getPortfolioItems:', error.message); return []; }
+    return data ?? [];
+  },
+
+  async createPortfolioItem(item: Omit<PortfolioItem, 'id' | 'created_at' | 'updated_at'>): Promise<PortfolioItem | null> {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('portfolio_items').insert([item]).select().single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async updatePortfolioItem(id: string, updates: Partial<Omit<PortfolioItem, 'id' | 'created_at' | 'updated_at'>>): Promise<PortfolioItem | null> {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('portfolio_items').update(updates).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async deletePortfolioItem(id: string): Promise<void> {
+    if (!supabase) return;
+    const { error } = await supabase.from('portfolio_items').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
+  // Site Config
+  async getSiteConfig(): Promise<SiteConfigMap> {
+    if (!supabase) return {} as SiteConfigMap;
+    const { data, error } = await supabase.from('site_config').select('key, value');
+    if (error) { console.error('getSiteConfig:', error.message); return {} as SiteConfigMap; }
+    return Object.fromEntries((data ?? []).map(r => [r.key, r.value])) as SiteConfigMap;
+  },
+
+  async updateSiteConfig(key: string, value: string): Promise<void> {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('site_config')
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    if (error) throw new Error(error.message);
+  },
+
+  async updateSiteConfigBatch(updates: Partial<SiteConfigMap>): Promise<void> {
+    if (!supabase) return;
+    const rows = Object.entries(updates).map(([key, value]) => ({
+      key, value, updated_at: new Date().toISOString(),
+    }));
+    const { error } = await supabase.from('site_config').upsert(rows, { onConflict: 'key' });
+    if (error) throw new Error(error.message);
+  },
+
+  // Service Overrides
+  async getServiceOverrides(): Promise<ServiceOverride[]> {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('service_overrides').select('*');
+    if (error) { console.error('getServiceOverrides:', error.message); return []; }
+    return data ?? [];
+  },
+
+  async getServiceOverride(slug: string): Promise<ServiceOverride | null> {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('service_overrides').select('*').eq('slug', slug).single();
+    if (error) return null;
+    return data;
+  },
+
+  async upsertServiceOverride(slug: string, updates: { long_description?: string; image_url?: string }): Promise<void> {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('service_overrides')
+      .upsert({ slug, ...updates, updated_at: new Date().toISOString() }, { onConflict: 'slug' });
+    if (error) throw new Error(error.message);
+  },
+};

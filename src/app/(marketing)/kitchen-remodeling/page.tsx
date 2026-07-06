@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { getServiceBySlug, getRelatedServices } from '@/content/services';
 import ServicePageTemplate from '@/components/marketing/ServicePageTemplate';
+import { siteContentDb } from '@/lib/db';
 import { notFound } from 'next/navigation';
 
 const slug = 'kitchen-remodeling';
+export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {
   const s = getServiceBySlug(slug);
@@ -11,8 +13,16 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: s.seoTitle, description: s.seoDescription };
 }
 
-export default function Page() {
+export default async function Page() {
   const service = getServiceBySlug(slug);
   if (!service) notFound();
-  return <ServicePageTemplate service={service} related={getRelatedServices(slug)} />;
+  const override = await siteContentDb.getServiceOverride(slug);
+  return (
+    <ServicePageTemplate
+      service={service}
+      related={getRelatedServices(slug)}
+      overrideDescription={override?.long_description}
+      overrideImageUrl={override?.image_url}
+    />
+  );
 }

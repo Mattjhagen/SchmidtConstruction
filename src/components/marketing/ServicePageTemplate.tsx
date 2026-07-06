@@ -7,9 +7,13 @@ import { site } from '@/content/site';
 interface Props {
   service: Service;
   related: Service[];
+  overrideDescription?: string;
+  overrideImageUrl?: string;
 }
 
-export default function ServicePageTemplate({ service, related }: Props) {
+export default function ServicePageTemplate({ service, related, overrideDescription, overrideImageUrl }: Props) {
+  const description = overrideDescription || service.longDescription;
+  const _imageUrl = overrideImageUrl || service.image;
   return (
     <>
       {/* Hero */}
@@ -45,7 +49,7 @@ export default function ServicePageTemplate({ service, related }: Props) {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-2 gap-12">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">About This Service</h2>
-            <p className="text-gray-600 leading-relaxed">{service.longDescription}</p>
+            <p className="text-gray-600 leading-relaxed">{description}</p>
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">What&apos;s Included</h2>

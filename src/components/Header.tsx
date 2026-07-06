@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isDemoMode } from '../lib/db';
 import Image from 'next/image';
-import { Users, Database, Settings, Award, LucideIcon } from 'lucide-react';
+import { Users, Database, Settings, Award, Globe, LucideIcon } from 'lucide-react';
 
 export default function Header() {
   const pathname = usePathname();
@@ -34,6 +34,7 @@ export default function Header() {
   const navItems: { name: string; href: string; icon: LucideIcon | null }[] = [
     { name: 'Dashboard', href: '/dashboard', icon: null },
     { name: 'Clients', href: '/clients', icon: Users },
+    { name: 'Site Editor', href: '/admin', icon: Globe },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
