@@ -5,6 +5,12 @@ import { useState, useRef, useEffect } from 'react';
 import { site } from '@/content/site';
 import Image from 'next/image';
 
+const moreItems = [
+  { label: 'Service Areas', href: '/service-areas' },
+  { label: 'About Us', href: '/about' },
+  { label: 'Hiring', href: '/hiring' },
+];
+
 const retainingWallItems = [
   { label: 'Retaining Wall Installation', href: '/retaining-wall-installation' },
   { label: 'Block Retaining Wall', href: '/block-retaining-wall' },
@@ -122,18 +128,10 @@ export default function MarketingHeader() {
             <Link href="/portfolio" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors">
               Portfolio
             </Link>
-            <Link href="/service-areas" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors">
-              Service Areas
-            </Link>
-            <Link href="/about" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors">
-              About
-            </Link>
-            <Link href="/hiring" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors">
-              Hiring
-            </Link>
             <Link href="/contact" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors">
               Contact
             </Link>
+            <DropdownMenu label="More" items={moreItems} />
             <a
               href={site.phoneHref}
               className="ml-2 inline-flex items-center bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
