@@ -93,6 +93,38 @@ export interface ProposalVersion {
   deposit_amount?: number;
   balance_due_text?: string;
   acceptance_language?: string;
+  // Phase 5 additions
+  wall_sections?: WallSection[];
+}
+
+// ============================================================
+// PHASE 5: WALL DIMENSIONS & SAVED OPTIONS
+// ============================================================
+
+export interface WallSection {
+  id: string;
+  label: string;
+  length_ft: number;
+  height_ft: number;
+  area_sf: number;
+  notes?: string;
+  include_in_total: boolean;
+}
+
+export interface SavedProposalOption {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  default_price: number;
+  default_unit: string;
+  default_quantity: number;
+  default_markup_percent: number;
+  line_item_type: LineItemType;
+  client_selectable: boolean;
+  selected_by_default: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export type LineItemType = 'required' | 'optional' | 'phase' | 'alternate';
