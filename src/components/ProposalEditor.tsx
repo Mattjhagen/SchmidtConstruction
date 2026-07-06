@@ -7,8 +7,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/db';
 import { PROPOSAL_TEMPLATES } from '../lib/templates';
-import { Proposal, Project, Client, ProposalVersion, ProposalLineItem, LineItemType, CatalogInsertResult } from '../lib/types';
+import { Proposal, Project, Client, ProposalVersion, ProposalLineItem, LineItemType, CatalogInsertResult, WallSection } from '../lib/types';
 import CatalogPicker from './CatalogPicker';
+import WallDimensionsPanel from './WallDimensionsPanel';
+import SavedOptionsPanel from './SavedOptionsPanel';
 import {
   FileText,
   Trash2,
@@ -98,6 +100,7 @@ export default function ProposalEditor({
   const [discountValue, setDiscountValue] = useState(0);
 
   const [lineItems, setLineItems] = useState<LineItemState[]>([]);
+  const [wallSections, setWallSections] = useState<WallSection[]>([]);
   const [isLocked, setIsLocked] = useState(false);
   const [isRevisionMode, setIsRevisionMode] = useState(isRevision);
   const [activeTab, setActiveTab] = useState<'items' | 'terms' | 'notes'>('items');
@@ -144,6 +147,14 @@ export default function ProposalEditor({
     setSnippetField(null);
   }, [snippetField]);
 
+  const handleGenerateWallItems = useCallback((items: LineItemState[]) => {
+    setLineItems(prev => [...prev, ...items]);
+  }, []);
+
+  const handleSavedOptionInsert = useCallback((item: LineItemState) => {
+    setLineItems(prev => [...prev, item]);
+  }, []);
+
   useEffect(() => {
     const initData = async () => {
       try {
@@ -182,6 +193,7 @@ export default function ProposalEditor({
               setClientMessage(ver.client_message || '');
               setDiscountValue(Number(ver.discount));
               setTaxValue(Number(ver.tax));
+              setWallSections(Array.isArray(ver.wall_sections) ? ver.wall_sections : []);
 
               const isPropLocked = prop.status !== 'Draft';
               setIsLocked(isPropLocked && !isRevisionMode);
@@ -346,6 +358,7 @@ export default function ProposalEditor({
         deposit_amount: depositAmount,
         balance_due_text: balanceDueText,
         acceptance_language: acceptanceLanguage,
+        wall_sections: wallSections,
       };
 
       if (proposalId && proposal) {
@@ -512,6 +525,20 @@ export default function ProposalEditor({
               className="w-full bg-blue-50/40 px-3.5 py-2.5 rounded-xl border border-blue-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm disabled:bg-slate-50 disabled:text-slate-500 leading-relaxed"
             />
           </div>
+
+          {/* Wall Dimensions Panel */}
+          <WallDimensionsPanel
+            wallSections={wallSections}
+            onChange={setWallSections}
+            onGenerateItems={handleGenerateWallItems}
+            isLocked={isLocked}
+          />
+
+          {/* Saved Options Library */}
+          <SavedOptionsPanel
+            onInsert={handleSavedOptionInsert}
+            isLocked={isLocked}
+          />
 
           {/* Line Items */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 premium-shadow space-y-4">

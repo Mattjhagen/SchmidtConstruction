@@ -118,8 +118,9 @@ export default function CatalogPicker({ onInsert, onClose, filterType, snippetTa
   const [preview, setPreview]         = useState<CatalogItem | null>(null);
   const [quantityMap, setQuantityMap] = useState<Record<string, number>>({});
 
-  // Calculator state
-  const [calcTemplate, setCalcTemplate]         = useState<MeasurementTemplate>(MEASUREMENT_TEMPLATES[0]);
+  // Calculator state — store jobType string only, never a function-containing object
+  const [calcJobType, setCalcJobType]           = useState<string>(MEASUREMENT_TEMPLATES[0].jobType);
+  const calcTemplate = MEASUREMENT_TEMPLATES.find(t => t.jobType === calcJobType) ?? MEASUREMENT_TEMPLATES[0];
   const [calcInputs, setCalcInputs]             = useState<Record<string, number>>({});
   const [calcResults, setCalcResults]           = useState<MeasurementResult[]>([]);
   const [calcSelected, setCalcSelected]         = useState<Record<number, boolean>>({});
@@ -132,7 +133,7 @@ export default function CatalogPicker({ onInsert, onClose, filterType, snippetTa
     calcTemplate.inputs.forEach(inp => { defaults[inp.key] = inp.default ?? 0; });
     setCalcInputs(defaults);
     setCalcResults([]);
-  }, [calcTemplate]);
+  }, [calcJobType]); // depend on the string key, not the template object
 
   // ── Search ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -385,7 +386,7 @@ export default function CatalogPicker({ onInsert, onClose, filterType, snippetTa
               {MEASUREMENT_TEMPLATES.map(t => (
                 <button
                   key={t.jobType}
-                  onClick={() => { setCalcTemplate(t); setCalcResults([]); }}
+                  onClick={() => { setCalcJobType(t.jobType); setCalcResults([]); }}
                   className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer
                     ${calcTemplate.jobType === t.jobType
                       ? 'bg-amber-500 border-amber-500 text-slate-950'

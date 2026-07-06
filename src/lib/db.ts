@@ -9,7 +9,8 @@ import {
   ProposalVersion,
   ProposalLineItem,
   NegotiationEvent,
-  ProposalStatus
+  ProposalStatus,
+  SavedProposalOption,
 } from './types';
 import { PROPOSAL_TEMPLATES } from './templates';
 
@@ -1463,6 +1464,68 @@ export const db = {
       list.push(newLog);
       setLocalStorageData('schmidt_audit_logs', list);
       return newLog;
+    }
+  },
+
+  // --- SAVED PROPOSAL OPTIONS ---
+  async getSavedOptions(): Promise<SavedProposalOption[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('saved_proposal_options')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return (data || []) as SavedProposalOption[];
+    } else {
+      initLocalStorageDB();
+      return getLocalStorageData<SavedProposalOption[]>('schmidt_saved_options', [])
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+  },
+
+  async createSavedOption(
+    option: Omit<SavedProposalOption, 'id' | 'created_at' | 'updated_at'>
+  ): Promise<SavedProposalOption> {
+    const now = new Date().toISOString();
+    const newOption: SavedProposalOption = { ...option, id: generateUUID(), created_at: now, updated_at: now };
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('saved_proposal_options').insert([newOption]).select().single();
+      if (error) throw error;
+      return data as SavedProposalOption;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<SavedProposalOption[]>('schmidt_saved_options', []);
+      list.push(newOption);
+      setLocalStorageData('schmidt_saved_options', list);
+      return newOption;
+    }
+  },
+
+  async updateSavedOption(
+    id: string,
+    updates: Partial<Omit<SavedProposalOption, 'id' | 'created_at'>>
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('saved_proposal_options').update({ ...updates, updated_at: now }).eq('id', id);
+      if (error) throw error;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<SavedProposalOption[]>('schmidt_saved_options', []);
+      const idx = list.findIndex(o => o.id === id);
+      if (idx !== -1) list[idx] = { ...list[idx], ...updates, updated_at: now };
+      setLocalStorageData('schmidt_saved_options', list);
+    }
+  },
+
+  async deleteSavedOption(id: string): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('saved_proposal_options').delete().eq('id', id);
+      if (error) throw error;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<SavedProposalOption[]>('schmidt_saved_options', []);
+      setLocalStorageData('schmidt_saved_options', list.filter(o => o.id !== id));
     }
   },
 
