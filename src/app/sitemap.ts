@@ -7,9 +7,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages = [
     { url: base, priority: 1.0 },
     { url: `${base}/about`, priority: 0.7 },
-    { url: `${base}/portfolio`, priority: 0.7 },
+    { url: `${base}/portfolio`, priority: 0.8 },
     { url: `${base}/service-areas`, priority: 0.7 },
     { url: `${base}/contact`, priority: 0.9 },
+    { url: `${base}/hiring`, priority: 0.6 },
   ];
 
   const servicePages = services.map((s) => ({
