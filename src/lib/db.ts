@@ -1060,8 +1060,14 @@ export const db = {
       }]);
       if (pErr) throw pErr;
 
-      const { error: vErr } = await supabase.from('proposal_versions').insert([newVersion]);
+      // wall_sections requires migration 20260704 — strip for the insert, apply silently after.
+      const { wall_sections: ws, ...coreNewVersion } = newVersion as any;
+      const { error: vErr } = await supabase.from('proposal_versions').insert([coreNewVersion]);
       if (vErr) throw vErr;
+      if (ws !== undefined && ws !== null) {
+        await supabase.from('proposal_versions').update({ wall_sections: ws }).eq('id', versionId)
+          .then(({ error }) => { if (error) console.warn('wall_sections not yet migrated:', error.message); });
+      }
 
       // Update current version key
       const { error: pUpdateErr } = await supabase.from('proposals').update({ current_version_id: versionId }).eq('id', proposalId);
@@ -1289,8 +1295,15 @@ export const db = {
     };
 
     if (isSupabaseConfigured && supabase) {
-      const { error: vErr } = await supabase.from('proposal_versions').insert([newVersion]);
+      // wall_sections requires migration 20260704 — strip it for the main insert,
+      // then apply it in a silent follow-up so saves work before migration runs.
+      const { wall_sections, ...coreVersion } = newVersion as any;
+      const { error: vErr } = await supabase.from('proposal_versions').insert([coreVersion]);
       if (vErr) throw vErr;
+      if (wall_sections !== undefined && wall_sections !== null) {
+        await supabase.from('proposal_versions').update({ wall_sections }).eq('id', versionId)
+          .then(({ error }) => { if (error) console.warn('wall_sections not yet migrated:', error.message); });
+      }
 
       const { error: pErr } = await supabase.from('proposals').update({
         current_version_id: versionId,
@@ -1356,8 +1369,15 @@ export const db = {
     lineItems: Omit<ProposalLineItem, 'id' | 'proposal_version_id'>[]
   ): Promise<void> {
     if (isSupabaseConfigured && supabase) {
-      const { error: vErr } = await supabase.from('proposal_versions').update(versionData).eq('id', versionId);
+      // wall_sections requires migration 20260704 — strip it for the main update,
+      // then apply it in a silent follow-up so saves work before migration runs.
+      const { wall_sections, ...coreVersionData } = versionData as any;
+      const { error: vErr } = await supabase.from('proposal_versions').update(coreVersionData).eq('id', versionId);
       if (vErr) throw vErr;
+      if (wall_sections !== undefined && wall_sections !== null) {
+        await supabase.from('proposal_versions').update({ wall_sections }).eq('id', versionId)
+          .then(({ error }) => { if (error) console.warn('wall_sections not yet migrated:', error.message); });
+      }
 
       const { error: delErr } = await supabase.from('proposal_line_items').delete().eq('proposal_version_id', versionId);
       if (delErr) throw delErr;
