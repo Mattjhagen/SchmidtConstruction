@@ -1,13 +1,9 @@
-# Day 8 — Employee Time Clock, Access Control & Payroll Timesheets
+# Day 8 — Employee Time Clock, Access Control, Payroll Timesheets & Repo Split
 
 **Date:** 2026-07-09
 **Repo:** SchmidtConstruction (Next.js 16 · TypeScript · Tailwind 4 · Supabase)
 
-> Summary: Built a complete employee time-tracking system on top of the existing
-> proposals app — self-service time clock, admin timesheets with payroll, a
-> host-split access-control model, invite-token employee onboarding, and a
-> branded PDF/CSV/email export pipeline. Also fixed a login-session bug that
-> blocked email/password sign-in.
+> Summary: Built a complete employee time-tracking system — self-service time clock, admin timesheets with payroll, a host-split access-control model, invite-token employee onboarding, and a branded PDF/CSV/email export pipeline. Also fixed a login-session bug that blocked email/password sign-in. Then split the monorepo into two separate Vercel-deployed services and resolved DNS issues for `login.schmidt-construction.com`.
 
 ---
 
@@ -96,18 +92,67 @@
 
 ---
 
+## 7. DNS & Domain Resolution
+
+- Confirmed `www.schmidt-construction.com` was live after nameservers were moved to Vercel.
+- `login.schmidt-construction.com` was hanging — root cause: domain existed in Cloudflare DNS (now inactive since Vercel manages DNS) but was never added to the Vercel project.
+- Added `login.schmidt-construction.com` to `schmidt-construction` Vercel project → showed "Valid Configuration".
+- Fixed footer "Admin Portal" link to use `https://login.schmidt-construction.com/login`.
+- Fixed `proxy.ts` on main site to redirect `login.schmidt-construction.com/` → `/portal/login` (client portal) instead of falling through to admin auth.
+
+---
+
+## 8. Repo Split: SchmidtConstruction → SchmidtConstruction + SchmidtAdmin
+
+### Motivation
+The single repo was serving two unrelated audiences:
+- **Public/clients** — marketing site, client portal (`/portal/[share_token]`)
+- **Internal** — estimator dashboard, proposals, catalog, admin tools
+
+### Split Plan
+| Repo | Domain | Contains |
+|---|---|---|
+| `SchmidtConstruction` | `www.schmidt-construction.com` | Marketing pages, client portal, terms/privacy |
+| `SchmidtAdmin` | `login.schmidt-construction.com` | Admin dashboard, proposals, clients, projects, catalog, settings, API routes |
+
+### SchmidtAdmin Repo (`git@github.com:Mattjhagen/SchmidtAdmin.git`)
+Created new repo with:
+- `src/app/(app)/` — all admin/estimator pages
+- `src/app/login/` — admin cookie auth login
+- `src/app/api/` — proposal send + test-email API routes
+- `src/app/actions/` — server actions (uploadImage, sendContactForm)
+- `src/components/` — admin-only components
+- `src/lib/` — full lib layer
+- `src/proxy.ts` — simplified middleware: cookie-only auth, no portal redirect logic
+- `src/app/page.tsx` — root redirects to `/dashboard`
+- `src/app/robots.ts` — `disallow: '/'` (not indexed)
+
+### Build Fixes Required
+1. **Missing `package-lock.json`** — Vercel stopped at "Cloning completed" with no further output; adding lock file resolved it
+2. **BOM encoding on `package.json`** — PowerShell's `ConvertTo-Json | Set-Content` writes UTF-8 BOM; rewrote with the Write tool (clean UTF-8)
+3. **Missing `src/app/actions/`** — `ImageUploader.tsx` imported `@/app/actions/uploadImage` which wasn't copied in the initial split
+4. **Root 404 after login** — middleware redirected `/` → `/login?next=/`; after login, user was sent back to `/` which had no page; fixed by adding `src/app/page.tsx` that server-redirects to `/dashboard`
+
+### Vercel Deployment
+- New project: `schmidt-admin` (`prj_1Cz45Lq6nMVxSZ15Ubvjih9mOMNx`)
+- Moved `login.schmidt-construction.com` from `schmidt-construction` project to `schmidt-admin` project
+- Domain shows "Valid Configuration" — Vercel DNS auto-updated
+
+---
+
 ## Configuration Checklist (do outside the code)
 
 - [ ] Run both migrations on Supabase: `20260709000000_phase_7_time_clock.sql`, then `20260709010000_phase_7_employee_invites.sql`.
-- [ ] Vercel domain: add `login.schmidt-construction.com` to the project.
 - [ ] Supabase → Auth → URL Configuration → Redirect URLs:
   - `https://login.schmidt-construction.com/portal/auth/callback`
   - `https://login.schmidt-construction.com/portal/dashboard`
   - `https://login.schmidt-construction.com/dashboard`
   - `https://login.schmidt-construction.com/reset-password`
   - Site URL: `https://login.schmidt-construction.com`
-- [ ] Vercel env var: `NEXT_PUBLIC_PORTAL_URL=https://login.schmidt-construction.com` (clean quote links, no redirect hop), then redeploy.
+- [ ] Add env vars to `schmidt-admin` Vercel project: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `RESEND_API_KEY`, `NEXT_PUBLIC_SITE_URL=https://login.schmidt-construction.com`, `EMAIL_OVERRIDE_TO`
+- [ ] Vercel env var: `NEXT_PUBLIC_PORTAL_URL=https://login.schmidt-construction.com` on main project, then redeploy.
 - [ ] Confirm `RESEND_API_KEY` set in Vercel for timesheet email delivery.
+- [ ] Clean up `src/app/(app)/`, `src/app/login/`, `src/app/api/` from `SchmidtConstruction` main repo once admin is verified stable.
 
 ---
 
@@ -134,6 +179,14 @@
 - `src/components/marketing/MarketingFooter.tsx` — login-subdomain link
 - `src/app/portal/dashboard/page.tsx` — auto-route linked staff to admin app
 - `next.config.ts` — `turbopack.root` (silences multi-lockfile warning)
+
+---
+
+## Security Notes (Unchanged, Still Enforced)
+- `RESEND_API_KEY` never in client bundle — email sending stays server-side in `src/app/api/`
+- `sanitizeProposalVersionForClient()` strips `internal_notes` — not modified
+- Admin auth uses Supabase JWT cookies; client portal uses Supabase JWT — session isolation maintained
+- Admin repo `robots.ts` disallows all crawlers
 
 ---
 
