@@ -1,17 +1,19 @@
-docs/
-└── development-journal/
-    ├── README.md
-    ├── Day-01.md
-    ├── Day-02.md
-    ├── Day-03.md
-    └── Day-04.md
+# Schmidt Construction — Development Journal
 
-# Schmidt Construction Development Journal
-
-This folder contains a chronological engineering log of the project's development.
+This folder contains a chronological engineering log of the project's development —
+features built, bugs fixed, and decisions made.
 
 ## Entries
 
-- Day 1 — Initial MVP (Proposal System)
-- Day 2 — Production Email, Branding & WSL Migration
-- Day 3 — (Current Development)
+- **Day 1** — Initial MVP: proposal system (clients, projects, proposals, versioning)
+- **Day 2** — Production email (Resend), branding & environment setup
+- **Day 3** — Catalog system & core estimator development
+- **Day 4** — Proposal email flow, proposal PDF export, client portal email
+- **Day 5** — Wall dimensions (JSONB on proposal_versions) & saved proposal options library
+- **Day 6** — Marketing site: content system, components, SEO (sitemap/robots), build fixes
+- **Day 7** — Client portal, client accounts & Supabase auth, Terms/Privacy, navigation & redesign
+- **Day 8** — Employee time clock, host-split access control, invite-token onboarding, admin timesheets & branded PDF/CSV/email exports
+
+> Note: the consolidated running log across all days also lives in the top of
+> **Day-07.md** (dated sections). Each `Day-NN.md` file holds the detailed
+> entry for that day.
