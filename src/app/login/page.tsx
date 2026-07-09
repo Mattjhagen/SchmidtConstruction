@@ -84,6 +84,28 @@ function LoginForm() {
     }
   };
 
+  // Send a password-reset email. The link routes through the auth callback
+  // (which establishes a session) then to /reset-password to set a new one.
+  const [resetSent, setResetSent] = useState(false);
+  const handleForgotPassword = async () => {
+    if (!email) { setError('Enter your email above first, then click "Forgot password?".'); return; }
+    try {
+      setLoading(true);
+      setError(null);
+      const supabase = getSupabaseBrowser();
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/portal/auth/callback?next=/reset-password`,
+      });
+      if (resetErr) throw resetErr;
+      setResetSent(true);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || 'Could not send reset email.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-950 flex items-center justify-center p-4 z-50 overflow-y-auto">
       {/* Background accents */}
@@ -188,6 +210,19 @@ function LoginForm() {
           >
             {loading ? "Signing In..." : "Sign In to Dashboard"}
           </button>
+
+          {!isDemoMode && (
+            <div className="text-center pt-1">
+              {resetSent ? (
+                <p className="text-[11px] text-green-400 font-medium">Password reset email sent — check your inbox.</p>
+              ) : (
+                <button type="button" onClick={handleForgotPassword} disabled={loading}
+                  className="text-[11px] text-blue-400 hover:text-blue-300 font-medium cursor-pointer">
+                  Forgot password?
+                </button>
+              )}
+            </div>
+          )}
         </form>
 
         {/* Footer info */}

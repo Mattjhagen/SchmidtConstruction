@@ -29,7 +29,7 @@ const ADMIN_PREFIXES = [
 const PORTAL_PREFIX = '/portal';
 
 // Auth infrastructure + framework paths that are always allowed.
-const ALWAYS_ALLOW = ['/login', '/invite', '/portal/auth', '/_next', '/api', '/favicon.ico', '/robots.txt', '/sitemap.xml', '/llms.txt', '/icon.png', '/logo.png'];
+const ALWAYS_ALLOW = ['/login', '/invite', '/reset-password', '/portal/auth', '/_next', '/api', '/favicon.ico', '/robots.txt', '/sitemap.xml', '/llms.txt', '/icon.png', '/logo.png'];
 
 function isAdminPath(pathname: string): boolean {
   return ADMIN_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'));
@@ -60,7 +60,7 @@ export async function proxy(request: NextRequest) {
   // MAIN HOST: marketing only. Push any authenticated surface to the login subdomain.
   // -------------------------------------------------------------
   if (!isAdminSubdomain) {
-    if (isAdminPath(pathname) || isPortalPath(pathname) || pathname === '/login' || pathname.startsWith('/invite')) {
+    if (isAdminPath(pathname) || isPortalPath(pathname) || pathname === '/login' || pathname.startsWith('/invite') || pathname.startsWith('/reset-password')) {
       const url = request.nextUrl.clone();
       // Promote to the login subdomain, preserving path + query.
       url.host = host.startsWith('localhost') || host.includes('.localhost')
