@@ -12,6 +12,7 @@ import {
   ProposalStatus,
   SavedProposalOption,
 } from './types';
+import type { Employee, TimeEntry } from './types';
 import { PROPOSAL_TEMPLATES } from './templates';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -808,6 +809,32 @@ const setLocalStorageData = <T>(key: string, data: T) => {
   localStorage.setItem(key, JSON.stringify(data));
 };
 
+// -------------------------------------------------------------
+// TIME CLOCK MOCK DATA (Phase 7)
+// -------------------------------------------------------------
+const MOCK_EMPLOYEES: Employee[] = [
+  { id: 'e-carl', user_id: null, name: 'Carl Rivera', email: 'carl@schmidtconstruction.com', role: 'employee', hourly_rate: 32, active: true, created_at: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'e-dana', user_id: null, name: 'Dana Whitfield', email: 'dana@schmidtconstruction.com', role: 'employee', hourly_rate: 28, active: true, created_at: new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'e-owner', user_id: null, name: 'Sam Schmidt', email: 'office@schmidtconstruction.com', role: 'admin', hourly_rate: 0, active: true, created_at: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString() },
+];
+
+// A few closed shifts this week for demo timesheets.
+const shift = (id: string, empId: string, daysAgo: number, startHour: number, hours: number, breakMin: number, projectId: string | null): TimeEntry => {
+  const ci = new Date(); ci.setDate(ci.getDate() - daysAgo); ci.setHours(startHour, 0, 0, 0);
+  const co = new Date(ci.getTime() + hours * 60 * 60 * 1000);
+  return { id, employee_id: empId, clock_in: ci.toISOString(), clock_out: co.toISOString(), break_minutes: breakMin, project_id: projectId, notes: '', created_at: ci.toISOString() };
+};
+
+const MOCK_TIME_ENTRIES: TimeEntry[] = [
+  shift('t-carl-1', 'e-carl', 4, 7, 9, 30, 'p-backyard-remodel'),
+  shift('t-carl-2', 'e-carl', 3, 7, 9, 30, 'p-backyard-remodel'),
+  shift('t-carl-3', 'e-carl', 2, 7, 9, 30, 'p-drainage-correction'),
+  shift('t-carl-4', 'e-carl', 1, 7, 9, 30, 'p-drainage-correction'),
+  shift('t-dana-1', 'e-dana', 3, 8, 8, 30, 'p-kitchen-renovation'),
+  shift('t-dana-2', 'e-dana', 2, 8, 8, 30, 'p-kitchen-renovation'),
+  shift('t-dana-3', 'e-dana', 1, 8, 7.5, 30, null),
+];
+
 // Initialize LocalStorage with Mock Data if empty
 export const initLocalStorageDB = (force = false) => {
   if (typeof window === 'undefined') return;
@@ -819,6 +846,11 @@ export const initLocalStorageDB = (force = false) => {
     setLocalStorageData('schmidt_line_items', MOCK_LINE_ITEMS);
     setLocalStorageData('schmidt_negotiation_events', MOCK_NEGOTIATION_EVENTS);
     setLocalStorageData('schmidt_audit_logs', MOCK_AUDIT_LOGS);
+  }
+  // Time clock seed is independent so it initializes even on pre-existing demo databases.
+  if (force || !localStorage.getItem('schmidt_employees')) {
+    setLocalStorageData('schmidt_employees', MOCK_EMPLOYEES);
+    setLocalStorageData('schmidt_time_entries', MOCK_TIME_ENTRIES);
   }
 };
 
@@ -1549,7 +1581,157 @@ export const db = {
     }
   },
 
-  // --- SERVER-SIDE SANITIZATION ---
+  // --- TIME CLOCK: EMPLOYEES (Phase 7) ---
+  async getEmployees(): Promise<Employee[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('employees').select('*').order('name', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    } else {
+      initLocalStorageDB();
+      return getLocalStorageData<Employee[]>('schmidt_employees', []);
+    }
+  },
+
+  // Resolve the employee profile for a signed-in Supabase Auth user (self-service).
+  async getEmployeeByUserId(userId: string): Promise<Employee | null> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('employees').select('*').eq('user_id', userId).single();
+      if (error) return null;
+      return data;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<Employee[]>('schmidt_employees', []);
+      return list.find((e) => e.user_id === userId) || null;
+    }
+  },
+
+  async createEmployee(employee: Omit<Employee, 'id' | 'created_at'>): Promise<Employee> {
+    const newEmployee: Employee = { ...employee, id: generateUUID(), created_at: new Date().toISOString() };
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('employees').insert([newEmployee]).select().single();
+      if (error) throw error;
+      return data;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<Employee[]>('schmidt_employees', []);
+      list.push(newEmployee);
+      setLocalStorageData('schmidt_employees', list);
+      return newEmployee;
+    }
+  },
+
+  async updateEmployee(id: string, updates: Partial<Omit<Employee, 'id' | 'created_at'>>): Promise<Employee> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('employees').update(updates).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<Employee[]>('schmidt_employees', []);
+      const index = list.findIndex((e) => e.id === id);
+      if (index === -1) throw new Error('Employee not found');
+      const updated = { ...list[index], ...updates };
+      list[index] = updated;
+      setLocalStorageData('schmidt_employees', list);
+      return updated;
+    }
+  },
+
+  // --- TIME CLOCK: TIME ENTRIES (Phase 7) ---
+  async getTimeEntries(employeeId?: string): Promise<TimeEntry[]> {
+    if (isSupabaseConfigured && supabase) {
+      let query = supabase.from('time_entries').select('*').order('clock_in', { ascending: false });
+      if (employeeId) query = query.eq('employee_id', employeeId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } else {
+      initLocalStorageDB();
+      let list = getLocalStorageData<TimeEntry[]>('schmidt_time_entries', []);
+      if (employeeId) list = list.filter((t) => t.employee_id === employeeId);
+      return list.sort((a, b) => new Date(b.clock_in).getTime() - new Date(a.clock_in).getTime());
+    }
+  },
+
+  // Return the currently-open shift for an employee (clock_out IS NULL), if any.
+  async getOpenTimeEntry(employeeId: string): Promise<TimeEntry | null> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('time_entries').select('*')
+        .eq('employee_id', employeeId).is('clock_out', null).maybeSingle();
+      if (error) return null;
+      return data;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<TimeEntry[]>('schmidt_time_entries', []);
+      return list.find((t) => t.employee_id === employeeId && !t.clock_out) || null;
+    }
+  },
+
+  // Clock in: opens a new shift. Rejects if one is already open.
+  async clockIn(employeeId: string, projectId: string | null = null): Promise<TimeEntry> {
+    const existing = await this.getOpenTimeEntry(employeeId);
+    if (existing) throw new Error('You are already clocked in.');
+    const newEntry: TimeEntry = {
+      id: generateUUID(),
+      employee_id: employeeId,
+      clock_in: new Date().toISOString(),
+      clock_out: null,
+      break_minutes: 0,
+      project_id: projectId,
+      notes: '',
+      created_at: new Date().toISOString(),
+    };
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('time_entries').insert([newEntry]).select().single();
+      if (error) throw error;
+      return data;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<TimeEntry[]>('schmidt_time_entries', []);
+      list.push(newEntry);
+      setLocalStorageData('schmidt_time_entries', list);
+      return newEntry;
+    }
+  },
+
+  // Clock out: closes the open shift, recording break minutes and optional notes.
+  async clockOut(employeeId: string, breakMinutes = 0, notes = ''): Promise<TimeEntry> {
+    const open = await this.getOpenTimeEntry(employeeId);
+    if (!open) throw new Error('You are not clocked in.');
+    const updates = { clock_out: new Date().toISOString(), break_minutes: breakMinutes, notes };
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('time_entries').update(updates).eq('id', open.id).select().single();
+      if (error) throw error;
+      return data;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<TimeEntry[]>('schmidt_time_entries', []);
+      const idx = list.findIndex((t) => t.id === open.id);
+      if (idx === -1) throw new Error('Time entry not found');
+      list[idx] = { ...list[idx], ...updates };
+      setLocalStorageData('schmidt_time_entries', list);
+      return list[idx];
+    }
+  },
+
+  // Admin correction of a time entry (edit times/break/notes).
+  async updateTimeEntry(id: string, updates: Partial<Omit<TimeEntry, 'id' | 'employee_id' | 'created_at'>>): Promise<TimeEntry> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('time_entries').update(updates).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<TimeEntry[]>('schmidt_time_entries', []);
+      const idx = list.findIndex((t) => t.id === id);
+      if (idx === -1) throw new Error('Time entry not found');
+      list[idx] = { ...list[idx], ...updates };
+      setLocalStorageData('schmidt_time_entries', list);
+      return list[idx];
+    }
+  },
+
   sanitizeProposalVersionForClient(version: ProposalVersion): ProposalVersion {
     const sanitized = { ...version };
     // Securely delete internal notes so they never reach the client payload

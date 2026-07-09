@@ -316,3 +316,51 @@ export interface CatalogInsertResult {
   snippetContent?: string;
   snippetTarget?: SnippetDetail['insert_target'];
 }
+
+// ============================================================
+// PHASE 7: EMPLOYEE TIME CLOCK
+// ============================================================
+
+export type EmployeeRole = 'employee' | 'admin';
+
+export interface Employee {
+  id: string;
+  user_id: string | null; // Supabase Auth user link
+  name: string;
+  email: string;
+  role: EmployeeRole;
+  hourly_rate: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface TimeEntry {
+  id: string;
+  employee_id: string;
+  clock_in: string;          // ISO timestamp
+  clock_out: string | null;  // null while shift is open (currently clocked in)
+  break_minutes: number;
+  project_id: string | null; // optional job-costing link
+  notes: string;
+  created_at: string;
+}
+
+// A single entry with its computed worked hours (net of break).
+export interface TimeEntryWithHours extends TimeEntry {
+  worked_hours: number; // (clock_out - clock_in) - break, in hours; 0 if still open
+  is_open: boolean;
+}
+
+// Payroll rollup for one employee over a date range (e.g. a pay period or week).
+export interface TimesheetSummary {
+  employee_id: string;
+  employee_name: string;
+  hourly_rate: number;
+  total_hours: number;
+  regular_hours: number;   // capped at 40/week across the range
+  overtime_hours: number;  // hours beyond 40 in any ISO week
+  regular_pay: number;
+  overtime_pay: number;    // paid at 1.5x
+  total_pay: number;
+  entries: TimeEntryWithHours[];
+}

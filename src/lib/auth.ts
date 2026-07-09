@@ -93,3 +93,13 @@ export const auth = {
     clearAuthCookie();
   }
 };
+
+// Return the Supabase Auth user id for the signed-in user (null in demo mode
+// or when not signed in). Used by the time clock to resolve the employee row.
+export async function getAuthUserId(): Promise<string | null> {
+  if (isSupabaseConfigured && supabase) {
+    const { data } = await supabase.auth.getUser();
+    return data.user?.id ?? null;
+  }
+  return null;
+}
