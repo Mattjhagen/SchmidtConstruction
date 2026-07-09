@@ -27,6 +27,13 @@ export function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Root of login subdomain → client portal login
+  if (pathname === '/') {
+    const portalLogin = request.nextUrl.clone();
+    portalLogin.pathname = '/portal/login';
+    return NextResponse.redirect(portalLogin, { status: 302 });
+  }
+
   // Always allow public paths (login page, static assets, API routes)
   const isPublic = PUBLIC_PATHS.some(p => pathname.startsWith(p));
   if (isPublic) return NextResponse.next();
