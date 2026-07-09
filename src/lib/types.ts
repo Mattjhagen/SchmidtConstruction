@@ -344,6 +344,7 @@ export interface TimeEntry {
   clock_in: string;          // ISO timestamp
   clock_out: string | null;  // null while shift is open (currently clocked in)
   break_minutes: number;
+  break_start?: string | null; // ISO timestamp while on lunch; null otherwise
   project_id: string | null; // optional job-costing link
   notes: string;
   created_at: string;
@@ -353,6 +354,7 @@ export interface TimeEntry {
 export interface TimeEntryWithHours extends TimeEntry {
   worked_hours: number; // (clock_out - clock_in) - break, in hours; 0 if still open
   is_open: boolean;
+  is_capped?: boolean;  // true if an open shift was auto-capped at midnight (forgot to clock out)
 }
 
 // Payroll rollup for one employee over a date range (e.g. a pay period or week).

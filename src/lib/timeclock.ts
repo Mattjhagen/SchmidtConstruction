@@ -11,34 +11,65 @@ import { Employee, TimeEntry, TimeEntryWithHours, TimesheetSummary } from './typ
 export const OVERTIME_THRESHOLD_HOURS = 40;
 export const OVERTIME_MULTIPLIER = 1.5;
 
-/** Net worked hours for a single entry (break deducted). Open shifts return 0. */
-export function computeWorkedHours(entry: TimeEntry): number {
-  if (!entry.clock_out) return 0;
+/** Midnight (00:00) at the END of the given date's day — i.e. start of next day. */
+function endOfDay(d: Date): Date {
+  const m = new Date(d);
+  m.setHours(24, 0, 0, 0); // rolls to 00:00 next day
+  return m;
+}
+
+/**
+ * Effective end time for a shift:
+ *  - closed shift               -> clock_out
+ *  - open, started today        -> now (still running)
+ *  - open, started on a past day -> midnight of that start day (auto-cap)
+ */
+export function effectiveEnd(entry: TimeEntry, now: Date = new Date()): { end: Date; capped: boolean } {
+  if (entry.clock_out) return { end: new Date(entry.clock_out), capped: false };
+  const start = new Date(entry.clock_in);
+  const midnight = endOfDay(start);
+  if (now.getTime() >= midnight.getTime()) return { end: midnight, capped: true };
+  return { end: now, capped: false };
+}
+
+/** Total break minutes including an in-progress lunch (break_start). */
+export function effectiveBreakMinutes(entry: TimeEntry, now: Date = new Date()): number {
+  let mins = entry.break_minutes || 0;
+  if (entry.break_start) {
+    const bs = new Date(entry.break_start).getTime();
+    if (!isNaN(bs) && now.getTime() > bs) mins += (now.getTime() - bs) / (1000 * 60);
+  }
+  return mins;
+}
+
+/**
+ * Net worked hours for an entry (break deducted). Open shifts count up to their
+ * effective end (now, or midnight cap if left open overnight).
+ */
+export function computeWorkedHours(entry: TimeEntry, now: Date = new Date()): number {
   const start = new Date(entry.clock_in).getTime();
-  const end = new Date(entry.clock_out).getTime();
+  const { end: endDate } = effectiveEnd(entry, now);
+  const end = endDate.getTime();
   if (isNaN(start) || isNaN(end) || end <= start) return 0;
   const grossHours = (end - start) / (1000 * 60 * 60);
-  const netHours = grossHours - (entry.break_minutes || 0) / 60;
+  const netHours = grossHours - effectiveBreakMinutes(entry, now) / 60;
   return Math.max(0, Math.round(netHours * 100) / 100);
 }
 
 /** Attach computed worked hours + open flag to an entry. */
-export function withHours(entry: TimeEntry): TimeEntryWithHours {
+export function withHours(entry: TimeEntry, now: Date = new Date()): TimeEntryWithHours {
+  const { capped } = effectiveEnd(entry, now);
   return {
     ...entry,
-    worked_hours: computeWorkedHours(entry),
+    worked_hours: computeWorkedHours(entry, now),
     is_open: !entry.clock_out,
+    is_capped: !entry.clock_out && capped,
   };
 }
 
-/** Live elapsed hours for an in-progress shift (break deducted), for UI counters. */
+/** Live elapsed hours for an in-progress shift (break deducted, midnight-capped). */
 export function liveElapsedHours(entry: TimeEntry, now: Date = new Date()): number {
-  const start = new Date(entry.clock_in).getTime();
-  const end = now.getTime();
-  if (isNaN(start) || end <= start) return 0;
-  const grossHours = (end - start) / (1000 * 60 * 60);
-  const netHours = grossHours - (entry.break_minutes || 0) / 60;
-  return Math.max(0, Math.round(netHours * 100) / 100);
+  return computeWorkedHours(entry, now);
 }
 
 /**
@@ -64,12 +95,15 @@ export function summarizeTimesheet(
   employee: Pick<Employee, 'id' | 'name' | 'hourly_rate'>,
   entries: TimeEntry[]
 ): TimesheetSummary {
-  const withHrs = entries.map(withHours);
+  // NOTE: wrap in an arrow so Array.map's index isn't passed as `now`.
+  const nowTs = new Date();
+  const withHrs = entries.map((e) => withHours(e, nowTs));
 
   // Group closed hours by ISO week to apply the weekly OT threshold.
+  // Open shifts are included at their effective (live or midnight-capped) hours
+  // so a forgotten clock-out still reaches payroll instead of being dropped.
   const weekTotals: Record<string, number> = {};
   for (const e of withHrs) {
-    if (e.is_open) continue;
     const key = isoWeekKey(e.clock_in);
     weekTotals[key] = (weekTotals[key] || 0) + e.worked_hours;
   }

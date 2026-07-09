@@ -106,6 +106,34 @@ export default function TimeClockPage() {
     }
   };
 
+  const handleStartLunch = async () => {
+    if (!employee) return;
+    setBusy(true);
+    setError('');
+    try {
+      await db.startLunch(employee.id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start lunch.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleEndLunch = async () => {
+    if (!employee) return;
+    setBusy(true);
+    setError('');
+    try {
+      await db.endLunch(employee.id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not end lunch.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -130,6 +158,7 @@ export default function TimeClockPage() {
   const summary = summarizeTimesheet(employee, entries);
   const liveHours = openEntry ? liveElapsedHours(openEntry, now) : 0;
   const clockInTime = openEntry ? new Date(openEntry.clock_in) : null;
+  const onLunch = !!openEntry?.break_start;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -206,6 +235,31 @@ export default function TimeClockPage() {
                   />
                 </div>
               </div>
+              {/* Lunch break button + on-lunch indicator */}
+              {onLunch ? (
+                <div className="flex flex-col items-center gap-2">
+                  <span className="inline-flex items-center text-sm font-medium text-amber-600">
+                    <Coffee className="h-4 w-4 mr-1.5" /> On lunch — the clock keeps running but this time is deducted
+                  </span>
+                  <button
+                    onClick={handleEndLunch}
+                    disabled={busy}
+                    className="inline-flex items-center space-x-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <Coffee className="h-4 w-4" />
+                    <span>End Lunch</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleStartLunch}
+                  disabled={busy}
+                  className="inline-flex items-center space-x-2 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50 font-semibold px-6 py-2.5 rounded-xl transition-colors cursor-pointer"
+                >
+                  <Coffee className="h-4 w-4" />
+                  <span>Start Lunch</span>
+                </button>
+              )}
               <button
                 onClick={handleClockOut}
                 disabled={busy}

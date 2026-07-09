@@ -1749,6 +1749,7 @@ export const db = {
       clock_in: new Date().toISOString(),
       clock_out: null,
       break_minutes: 0,
+      break_start: null,
       project_id: projectId,
       notes: '',
       created_at: new Date().toISOString(),
@@ -1771,6 +1772,49 @@ export const db = {
     const open = await this.getOpenTimeEntry(employeeId);
     if (!open) throw new Error('You are not clocked in.');
     const updates = { clock_out: new Date().toISOString(), break_minutes: breakMinutes, notes };
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('time_entries').update(updates).eq('id', open.id).select().single();
+      if (error) throw error;
+      return data;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<TimeEntry[]>('schmidt_time_entries', []);
+      const idx = list.findIndex((t) => t.id === open.id);
+      if (idx === -1) throw new Error('Time entry not found');
+      list[idx] = { ...list[idx], ...updates };
+      setLocalStorageData('schmidt_time_entries', list);
+      return list[idx];
+    }
+  },
+
+  // Start a lunch break on the currently open shift (records break_start).
+  async startLunch(employeeId: string): Promise<TimeEntry> {
+    const open = await this.getOpenTimeEntry(employeeId);
+    if (!open) throw new Error('You are not clocked in.');
+    if (open.break_start) throw new Error('You are already on a break.');
+    const updates = { break_start: new Date().toISOString() };
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('time_entries').update(updates).eq('id', open.id).select().single();
+      if (error) throw error;
+      return data;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<TimeEntry[]>('schmidt_time_entries', []);
+      const idx = list.findIndex((t) => t.id === open.id);
+      if (idx === -1) throw new Error('Time entry not found');
+      list[idx] = { ...list[idx], ...updates };
+      setLocalStorageData('schmidt_time_entries', list);
+      return list[idx];
+    }
+  },
+
+  // End the lunch break: add elapsed minutes to break_minutes, clear break_start.
+  async endLunch(employeeId: string): Promise<TimeEntry> {
+    const open = await this.getOpenTimeEntry(employeeId);
+    if (!open) throw new Error('You are not clocked in.');
+    if (!open.break_start) throw new Error('You are not on a break.');
+    const elapsedMin = Math.max(0, Math.round((Date.now() - new Date(open.break_start).getTime()) / 60000));
+    const updates = { break_minutes: (open.break_minutes || 0) + elapsedMin, break_start: null };
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('time_entries').update(updates).eq('id', open.id).select().single();
       if (error) throw error;

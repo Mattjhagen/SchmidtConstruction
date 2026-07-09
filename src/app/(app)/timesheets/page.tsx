@@ -697,10 +697,16 @@ export default function TimesheetsPage() {
                                 <td className="px-2 py-1 text-slate-700">{new Date(en.clock_in).toLocaleDateString()}</td>
                                 <td className="px-2 py-1 text-slate-600">{new Date(en.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                                 <td className="px-2 py-1 text-slate-600">
-                                  {en.clock_out ? new Date(en.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-green-600">In progress</span>}
+                                  {en.clock_out
+                                    ? new Date(en.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    : en.is_capped
+                                      ? <span className="text-amber-600 font-medium" title="No clock-out — auto-capped at midnight. Please verify and correct.">⚠ Missed clock-out</span>
+                                      : <span className="text-green-600">In progress</span>}
                                 </td>
                                 <td className="px-2 py-1 text-right text-slate-500">{en.break_minutes}m</td>
-                                <td className="px-2 py-1 text-right font-medium text-slate-800">{en.is_open ? '—' : en.worked_hours.toFixed(2)}</td>
+                                <td className={`px-2 py-1 text-right font-medium ${en.is_capped ? 'text-amber-600' : 'text-slate-800'}`}>
+                                  {en.is_open && !en.is_capped ? `${en.worked_hours.toFixed(2)}*` : en.worked_hours.toFixed(2)}
+                                </td>
                                 {isAdmin && (
                                   <td className="px-2 py-1 text-right whitespace-nowrap">
                                     <button onClick={() => startShiftEdit(en)} className="inline-flex items-center text-slate-400 hover:text-blue-700 cursor-pointer mr-2" title="Edit shift">
