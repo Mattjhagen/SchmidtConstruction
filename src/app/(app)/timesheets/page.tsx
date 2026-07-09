@@ -74,7 +74,11 @@ export default function TimesheetsPage() {
         const { data: { user } } = await getSupabaseBrowser().auth.getUser();
         if (user) {
           const emps0 = await db.getEmployees();
-          current = emps0.find((e) => e.user_id === user.id) ?? null;
+          // Match by auth user_id first; fall back to email (covers rows that
+          // were linked by email but never got user_id backfilled).
+          current = emps0.find((e) => e.user_id === user.id)
+            ?? emps0.find((e) => e.email && user.email && e.email.toLowerCase() === user.email.toLowerCase())
+            ?? null;
         }
       }
       setMe(current);
