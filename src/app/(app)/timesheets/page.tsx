@@ -7,7 +7,10 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { db } from '@/lib/db';
 import { Employee, TimeEntry } from '@/lib/types';
 import { summarizeTimesheet, formatCurrency } from '@/lib/timeclock';
-import { CalendarRange, Download, Users, Clock, TrendingUp, DollarSign, UserPlus, X, CheckCircle2, Link2, Copy, Ban } from 'lucide-react';
+import { buildTimesheetPdf, buildTimesheetCsv, downloadBlob } from '@/lib/timesheetPdf';
+import { getSupabaseBrowser } from '@/lib/supabaseClient';
+import { isDemoMode } from '@/lib/db';
+import { CalendarRange, Download, Users, Clock, TrendingUp, DollarSign, UserPlus, X, CheckCircle2, Link2, Copy, Ban, FileText, Mail, Plus } from 'lucide-react';
 
 // Default the range to the current ISO week (Mon–Sun).
 function currentWeekRange(): { from: string; to: string } {
@@ -28,6 +31,25 @@ export default function TimesheetsPage() {
   const [loading, setLoading] = useState(true);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Manual add-hours modal state.
+  const [showAddHours, setShowAddHours] = useState(false);
+  const [hoursForm, setHoursForm] = useState({
+    employee_id: '',
+    date: new Date().toISOString().split('T')[0],
+    clock_in: '07:00',
+    clock_out: '15:30',
+    break_minutes: 30,
+    notes: '',
+  });
+  const [savingHours, setSavingHours] = useState(false);
+
+  // Email modal state.
+  const [showEmail, setShowEmail] = useState(false);
+  const [emailTo, setEmailTo] = useState('mike@walls2.com');
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [empForm, setEmpForm] = useState({ name: '', email: '', hourly_rate: 0, role: 'employee' as 'employee' | 'admin' });
 
   const load = useCallback(async () => {
@@ -93,6 +115,109 @@ export default function TimesheetsPage() {
     a.download = `timesheet_${range.from}_to_${range.to}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // Save a manually-entered shift (admin correction for un-clocked time).
+  const handleSaveHours = async () => {
+    if (!hoursForm.employee_id) { setSendResult(null); return; }
+    setSavingHours(true);
+    try {
+      const clockIn = new Date(`${hoursForm.date}T${hoursForm.clock_in}:00`);
+      const clockOut = new Date(`${hoursForm.date}T${hoursForm.clock_out}:00`);
+      await db.createTimeEntry({
+        employee_id: hoursForm.employee_id,
+        clock_in: clockIn.toISOString(),
+        clock_out: clockOut.toISOString(),
+        break_minutes: hoursForm.break_minutes,
+        notes: hoursForm.notes,
+      });
+      setShowAddHours(false);
+      setHoursForm({ ...hoursForm, notes: '' });
+      await load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingHours(false);
+    }
+  };
+
+  const pdfMeta = () => ({ periodFrom: range.from, periodTo: range.to });
+
+  // Human-readable date range for the email modal.
+  const fmtRange = () => {
+    const f = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${f(range.from)} – ${f(range.to)}`;
+  };
+
+  // Download the professional PDF.
+  const handleDownloadPdf = async () => {
+    setPdfBusy(true);
+    try {
+      const blob = await buildTimesheetPdf(summaries, pdfMeta());
+      downloadBlob(blob, `Schmidt-Timesheet_${range.from}_to_${range.to}.pdf`);
+    } catch (e) {
+      console.error('PDF generation failed:', e);
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
+  // Base64-encode a Blob for email attachment.
+  const blobToBase64 = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result).split(',')[1] ?? '');
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
+  // Email the timesheet (PDF + CSV attachments + summary body) via the app mailer.
+  const handleSendEmail = async () => {
+    setSending(true);
+    setSendResult(null);
+    try {
+      if (isDemoMode) {
+        setSendResult({ ok: false, msg: 'Email requires Supabase + Resend — not available in demo mode. Deploy with env vars to enable delivery.' });
+        return;
+      }
+      const pdfBlob = await buildTimesheetPdf(summaries, pdfMeta());
+      const pdfB64 = await blobToBase64(pdfBlob);
+      const csv = buildTimesheetCsv(summaries, pdfMeta());
+      const csvB64 = btoa(unescape(encodeURIComponent(csv)));
+
+      const { data: { session } } = await getSupabaseBrowser().auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setSendResult({ ok: false, msg: 'Your session expired — please sign in again.' }); return; }
+
+      const res = await fetch('/api/timesheets/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          to: emailTo,
+          periodFrom: range.from,
+          periodTo: range.to,
+          rows: summaries.map((s) => ({
+            employee_name: s.employee_name,
+            regular_hours: s.regular_hours,
+            overtime_hours: s.overtime_hours,
+            total_hours: s.total_hours,
+            total_pay: s.total_pay,
+          })),
+          totals: { hours: totals.hours, overtime: totals.ot, pay: totals.pay },
+          attachments: [
+            { filename: `Schmidt-Timesheet_${range.from}_to_${range.to}.pdf`, content: pdfB64 },
+            { filename: `Schmidt-Timesheet_${range.from}_to_${range.to}.csv`, content: csvB64 },
+          ],
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Send failed');
+      setSendResult({ ok: true, msg: `Timesheet sent to ${json.sentTo}.` });
+    } catch (e) {
+      setSendResult({ ok: false, msg: e instanceof Error ? e.message : 'Failed to send.' });
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleAddEmployee = async () => {
@@ -172,6 +297,28 @@ export default function TimesheetsPage() {
           >
             <Download className="h-4 w-4" />
             <span>Export CSV</span>
+          </button>
+          <button
+            onClick={() => setShowAddHours(true)}
+            className="inline-flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Hours</span>
+          </button>
+          <button
+            onClick={handleDownloadPdf}
+            disabled={pdfBusy}
+            className="inline-flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <FileText className="h-4 w-4" />
+            <span>{pdfBusy ? 'Building…' : 'Download PDF'}</span>
+          </button>
+          <button
+            onClick={() => { setSendResult(null); setShowEmail(true); }}
+            className="inline-flex items-center space-x-2 bg-green-700 hover:bg-green-800 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer"
+          >
+            <Mail className="h-4 w-4" />
+            <span>Email Timesheet</span>
           </button>
         </div>
       </div>
@@ -324,6 +471,112 @@ export default function TimesheetsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Add / manual hours modal */}
+      {showAddHours && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md p-6 relative">
+            <button onClick={() => setShowAddHours(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer">
+              <X className="h-5 w-5" />
+            </button>
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Add Hours Manually</h2>
+            <p className="text-xs text-slate-500 mb-4">For shifts that weren&apos;t clocked. Overtime is recalculated automatically.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Employee</label>
+                <select
+                  value={hoursForm.employee_id}
+                  onChange={(e) => setHoursForm({ ...hoursForm, employee_id: e.target.value })}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">— Select employee —</option>
+                  {employees.filter((e) => e.active).map((e) => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Date</label>
+                <input type="date" value={hoursForm.date}
+                  onChange={(e) => setHoursForm({ ...hoursForm, date: e.target.value })}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">Clock In</label>
+                  <input type="time" value={hoursForm.clock_in}
+                    onChange={(e) => setHoursForm({ ...hoursForm, clock_in: e.target.value })}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">Clock Out</label>
+                  <input type="time" value={hoursForm.clock_out}
+                    onChange={(e) => setHoursForm({ ...hoursForm, clock_out: e.target.value })}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">Break (min)</label>
+                  <input type="number" min={0} value={hoursForm.break_minutes}
+                    onChange={(e) => setHoursForm({ ...hoursForm, break_minutes: Math.max(0, parseInt(e.target.value) || 0) })}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">Notes</label>
+                  <input type="text" value={hoursForm.notes} placeholder="Optional"
+                    onChange={(e) => setHoursForm({ ...hoursForm, notes: e.target.value })}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+              <button onClick={() => setShowAddHours(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 cursor-pointer">Cancel</button>
+              <button onClick={handleSaveHours} disabled={savingHours || !hoursForm.employee_id}
+                className="px-4 py-2 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg cursor-pointer disabled:opacity-50">
+                {savingHours ? 'Saving…' : 'Save Hours'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email timesheet modal */}
+      {showEmail && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md p-6 relative">
+            <button onClick={() => setShowEmail(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer">
+              <X className="h-5 w-5" />
+            </button>
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Email Timesheet</h2>
+            <p className="text-xs text-slate-500 mb-4">
+              Sends the {fmtRange()} timesheet with a summary plus PDF &amp; CSV attachments.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Send to</label>
+                <input type="email" value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              {sendResult && (
+                <div className={`text-xs rounded-lg px-3 py-2 ${sendResult.ok ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {sendResult.msg}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+              <button onClick={() => setShowEmail(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 cursor-pointer">Close</button>
+              <button onClick={handleSendEmail} disabled={sending || !emailTo}
+                className="px-4 py-2 text-sm font-semibold text-white bg-green-700 hover:bg-green-800 rounded-lg cursor-pointer disabled:opacity-50">
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add employee modal */}
       {showAddEmployee && (

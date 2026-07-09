@@ -20,6 +20,20 @@ export default async function ClientDashboardPage() {
     .eq('email', user.email!)
     .maybeSingle();
 
+  // Is this signed-in user actually an employee? (Helps show a better message
+  // when a staff member lands on the portal without a linked employee record,
+  // and auto-routes linked staff to the admin app.)
+  const { data: employee } = await supabase
+    .from('employees')
+    .select('id, user_id, role')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  // A linked employee should be in the admin app, not the client portal.
+  if (employee) {
+    redirect('/dashboard');
+  }
+
   let proposals: {
     id: string;
     proposal_number: string;
@@ -113,7 +127,7 @@ export default async function ClientDashboardPage() {
           </p>
           {!client && (
             <div className="mt-3 bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm rounded-xl px-4 py-3">
-              No client record found for <strong>{user.email}</strong>. Contact Schmidt Construction to link your account.
+              We couldn&apos;t find any proposals linked to <strong>{user.email}</strong> yet. If you were sent a proposal, make sure you signed in with the same email it was sent to. If you&apos;re a Schmidt Construction employee, ask an admin for your invite link to activate staff access. Otherwise, please contact us and we&apos;ll get you connected.
             </div>
           )}
         </div>

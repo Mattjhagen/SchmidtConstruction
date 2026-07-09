@@ -4,6 +4,7 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
+
 export interface SendProposalEmailParams {
   to: string;
   clientName: string;
@@ -201,6 +202,122 @@ export async function sendProposalEmail({
     to: recipient,
     subject,
     html: htmlWithBanner,
+    ...(replyTo ? { replyTo } : {}),
+  });
+}
+
+// ============================================================
+// TIMESHEET EMAIL (Phase 7)
+// ============================================================
+
+export interface TimesheetRow {
+  employee_name: string;
+  regular_hours: number;
+  overtime_hours: number;
+  total_hours: number;
+  total_pay: number;
+}
+
+export interface TimesheetAttachment {
+  filename: string;
+  content: string; // base64-encoded
+}
+
+export interface SendTimesheetEmailParams {
+  to: string;
+  periodFrom: string;
+  periodTo: string;
+  rows: TimesheetRow[];
+  totals: { hours: number; overtime: number; pay: number };
+  attachments: TimesheetAttachment[];
+  senderName?: string;
+}
+
+const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+const fmtPeriod = (d: string) =>
+  new Date(d + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+export async function sendTimesheetEmail({
+  to,
+  periodFrom,
+  periodTo,
+  rows,
+  totals,
+  attachments,
+  senderName,
+}: SendTimesheetEmailParams) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  const rowsHtml = rows
+    .map(
+      (r) => `
+        <tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:13px;">${r.employee_name}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#334155;font-size:13px;text-align:right;">${r.regular_hours.toFixed(2)}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:${r.overtime_hours > 0 ? "#d97706" : "#94a3b8"};font-size:13px;text-align:right;font-weight:${r.overtime_hours > 0 ? 700 : 400};">${r.overtime_hours.toFixed(2)}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:13px;text-align:right;font-weight:600;">${r.total_hours.toFixed(2)}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#15803d;font-size:13px;text-align:right;font-weight:700;">${usd(r.total_pay)}</td>
+        </tr>`
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" /></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 16px;">
+    <tr><td align="center">
+      <table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+        <tr><td style="background:#0f172a;padding:24px 32px;">
+          <img src="${siteUrl}/logo.png" width="190" alt="Schmidt Construction" style="display:block;border:0;max-width:190px;height:auto;" />
+          <p style="margin:16px 0 0;color:#fff;font-size:18px;font-weight:700;">Employee Timesheet</p>
+          <p style="margin:4px 0 0;color:#cbd5e1;font-size:13px;">${fmtPeriod(periodFrom)} – ${fmtPeriod(periodTo)}</p>
+        </td></tr>
+        <tr><td style="padding:28px 32px;">
+          <p style="margin:0 0 18px;color:#475569;font-size:14px;line-height:1.6;">
+            Attached is the timesheet for the pay period above (PDF + CSV). A summary is included below.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:8px 12px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;">Employee</th>
+              <th style="padding:8px 12px;text-align:right;font-size:11px;color:#64748b;text-transform:uppercase;">Reg</th>
+              <th style="padding:8px 12px;text-align:right;font-size:11px;color:#64748b;text-transform:uppercase;">OT</th>
+              <th style="padding:8px 12px;text-align:right;font-size:11px;color:#64748b;text-transform:uppercase;">Total</th>
+              <th style="padding:8px 12px;text-align:right;font-size:11px;color:#64748b;text-transform:uppercase;">Pay</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+            <tfoot><tr style="background:#0f172a;">
+              <td style="padding:10px 12px;color:#fff;font-size:13px;font-weight:700;">TOTALS</td>
+              <td style="padding:10px 12px;"></td>
+              <td style="padding:10px 12px;color:#fbbf24;font-size:13px;text-align:right;font-weight:700;">${totals.overtime.toFixed(2)}</td>
+              <td style="padding:10px 12px;color:#fff;font-size:13px;text-align:right;font-weight:700;">${totals.hours.toFixed(2)}</td>
+              <td style="padding:10px 12px;color:#4ade80;font-size:13px;text-align:right;font-weight:700;">${usd(totals.pay)}</td>
+            </tr></tfoot>
+          </table>
+          <p style="margin:22px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">
+            Overtime is calculated per week (over 40 hours at 1.5×).${senderName ? ` Sent by ${senderName}.` : ""}
+          </p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 32px;">
+          <p style="margin:0;color:#0f172a;font-size:13px;font-weight:700;">Schmidt Construction</p>
+          <p style="margin:4px 0 0;color:#94a3b8;font-size:12px;">Omaha, Nebraska · (402) 320-2600 · Mikiel@schmidt-construction.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const overrideTo = process.env.EMAIL_OVERRIDE_TO?.trim();
+  const recipient = overrideTo || to;
+  const replyTo = process.env.PROPOSAL_REPLY_TO;
+
+  return await getResend().emails.send({
+    from:
+      process.env.PROPOSAL_FROM_EMAIL ??
+      "Schmidt Construction <Mikiel@schmidt-construction.com>",
+    to: recipient,
+    subject: `Timesheet ${fmtPeriod(periodFrom)} – ${fmtPeriod(periodTo)} — Schmidt Construction`,
+    html,
+    attachments: attachments.map((a) => ({ filename: a.filename, content: a.content })),
     ...(replyTo ? { replyTo } : {}),
   });
 }

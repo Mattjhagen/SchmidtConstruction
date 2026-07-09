@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { db } from '@/lib/db';
 import { auth, getAuthUserId } from '@/lib/auth';
-import { Employee, TimeEntry, Project } from '@/lib/types';
+import { Employee, TimeEntry } from '@/lib/types';
 import {
   summarizeTimesheet,
   liveElapsedHours,
@@ -19,8 +19,6 @@ export default function TimeClockPage() {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [openEntry, setOpenEntry] = useState<TimeEntry | null>(null);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string>('');
   const [breakMinutes, setBreakMinutes] = useState<number>(0);
   const [notes, setNotes] = useState<string>('');
   const [now, setNow] = useState<Date>(new Date());
@@ -53,14 +51,12 @@ export default function TimeClockPage() {
       const emp = await resolveEmployee();
       setEmployee(emp);
       if (emp) {
-        const [open, list, projs] = await Promise.all([
+        const [open, list] = await Promise.all([
           db.getOpenTimeEntry(emp.id),
           db.getTimeEntries(emp.id),
-          db.getProjects(),
         ]);
         setOpenEntry(open);
         setEntries(list);
-        setProjects(projs);
       }
     } catch (e) {
       console.error(e);
@@ -85,7 +81,7 @@ export default function TimeClockPage() {
     setBusy(true);
     setError('');
     try {
-      await db.clockIn(employee.id, selectedProject || null);
+      await db.clockIn(employee.id, null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not clock in.');
@@ -102,7 +98,6 @@ export default function TimeClockPage() {
       await db.clockOut(employee.id, breakMinutes, notes);
       setBreakMinutes(0);
       setNotes('');
-      setSelectedProject('');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not clock out.');
@@ -176,21 +171,6 @@ export default function TimeClockPage() {
         <div className="mt-8">
           {!openEntry ? (
             <div className="space-y-4">
-              <div className="text-left max-w-sm mx-auto">
-                <label className="flex items-center text-xs font-semibold text-slate-500 mb-1">
-                  <Briefcase className="h-3.5 w-3.5 mr-1" /> Project (optional)
-                </label>
-                <select
-                  value={selectedProject}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">— No project —</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
               <button
                 onClick={handleClockIn}
                 disabled={busy}
