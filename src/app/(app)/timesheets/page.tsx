@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { db } from '@/lib/db';
 import { Employee, TimeEntry } from '@/lib/types';
 import { summarizeTimesheet, formatCurrency } from '@/lib/timeclock';
-import { CalendarRange, Download, Users, Clock, TrendingUp, DollarSign, UserPlus, X } from 'lucide-react';
+import { CalendarRange, Download, Users, Clock, TrendingUp, DollarSign, UserPlus, X, CheckCircle2, Link2, Copy, Ban } from 'lucide-react';
 
 // Default the range to the current ISO week (Mon–Sun).
 function currentWeekRange(): { from: string; to: string } {
@@ -27,6 +27,7 @@ export default function TimesheetsPage() {
   const [range, setRange] = useState(currentWeekRange());
   const [loading, setLoading] = useState(true);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [empForm, setEmpForm] = useState({ name: '', email: '', hourly_rate: 0, role: 'employee' as 'employee' | 'admin' });
 
   const load = useCallback(async () => {
@@ -109,6 +110,42 @@ export default function TimesheetsPage() {
     await load();
   };
 
+  // Build the full invite URL for a token (uses the login subdomain in prod).
+  const inviteUrl = (token: string) => {
+    if (typeof window !== 'undefined') {
+      const host = window.location.host;
+      // On localhost keep the current host; in prod force the login subdomain.
+      const base = host.includes('localhost')
+        ? `${window.location.protocol}//${host}`
+        : 'https://login.schmidt-construction.com';
+      return `${base}/invite/${token}`;
+    }
+    return `https://login.schmidt-construction.com/invite/${token}`;
+  };
+
+  const handleGenerateInvite = async (employeeId: string) => {
+    const token = await db.generateEmployeeInvite(employeeId);
+    await load();
+    try {
+      await navigator.clipboard.writeText(inviteUrl(token));
+      setCopiedId(employeeId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch { /* clipboard may be blocked; link still visible via Copy */ }
+  };
+
+  const handleCopyInvite = async (employeeId: string, token: string) => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl(token));
+      setCopiedId(employeeId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch { /* no-op */ }
+  };
+
+  const handleRevokeInvite = async (employeeId: string) => {
+    await db.revokeEmployeeInvite(employeeId);
+    await load();
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -171,6 +208,80 @@ export default function TimesheetsPage() {
         <div className="bg-white border border-slate-200 rounded-xl p-4">
           <div className="flex items-center text-slate-500 text-xs font-semibold mb-1"><DollarSign className="h-3.5 w-3.5 mr-1" /> TOTAL PAYROLL</div>
           <div className="text-2xl font-bold text-green-700">{formatCurrency(totals.pay)}</div>
+        </div>
+      </div>
+
+      {/* Employee roster & account link status */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <span className="font-semibold text-slate-700 text-sm">Employee Roster</span>
+          <span className="text-xs text-slate-400">{employees.length} total</span>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+            <tr>
+              <th className="text-left px-4 py-2 font-semibold">Name</th>
+              <th className="text-left px-4 py-2 font-semibold">Email</th>
+              <th className="text-left px-4 py-2 font-semibold">Role</th>
+              <th className="text-right px-4 py-2 font-semibold">Rate</th>
+              <th className="text-center px-4 py-2 font-semibold">Login Account</th>
+            </tr>
+          </thead>
+          <tbody>
+            {employees.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No employees yet — add one to get started.</td></tr>
+            )}
+            {employees.map((e) => (
+              <tr key={e.id} className="border-t border-slate-100">
+                <td className="px-4 py-2 font-medium text-slate-800">{e.name}</td>
+                <td className="px-4 py-2 text-slate-600">{e.email || <span className="text-slate-300">—</span>}</td>
+                <td className="px-4 py-2">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${e.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>
+                    {e.role}
+                  </span>
+                </td>
+                <td className="px-4 py-2 text-right text-slate-600">{formatCurrency(e.hourly_rate)}</td>
+                <td className="px-4 py-2 text-center">
+                  {e.user_id ? (
+                    <span className="inline-flex items-center text-xs font-medium text-green-700">
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Linked
+                    </span>
+                  ) : e.invite_token ? (
+                    <div className="inline-flex items-center gap-2">
+                      <button
+                        onClick={() => handleCopyInvite(e.id, e.invite_token!)}
+                        className="inline-flex items-center text-xs font-medium text-blue-700 hover:text-blue-900 cursor-pointer"
+                        title="Copy invite link"
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1" />
+                        {copiedId === e.id ? 'Copied!' : 'Copy invite'}
+                      </button>
+                      <button
+                        onClick={() => handleRevokeInvite(e.id)}
+                        className="inline-flex items-center text-xs font-medium text-slate-400 hover:text-red-600 cursor-pointer"
+                        title="Revoke this invite"
+                      >
+                        <Ban className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleGenerateInvite(e.id)}
+                      disabled={!e.email}
+                      title={e.email ? 'Generate an invite link' : 'Add an email first'}
+                      className="inline-flex items-center text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed px-2.5 py-1 rounded-lg cursor-pointer"
+                    >
+                      <Link2 className="h-3.5 w-3.5 mr-1" />
+                      {copiedId === e.id ? 'Link copied!' : 'Generate invite'}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
+          Add an employee with their work email, click <span className="font-medium text-slate-700">Generate invite</span> to copy a one-time link, and send it to them. They activate their account by signing in with that same email — the link only works for the matching email and can be revoked anytime.
         </div>
       </div>
 

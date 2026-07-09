@@ -332,6 +332,10 @@ export interface Employee {
   hourly_rate: number;
   active: boolean;
   created_at: string;
+  // Invite-token linking (Phase 7): set when an admin generates an invite,
+  // cleared when the employee redeems it. No expiry (revocable).
+  invite_token?: string | null;
+  invited_at?: string | null;
 }
 
 export interface TimeEntry {

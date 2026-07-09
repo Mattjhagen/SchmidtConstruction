@@ -6,7 +6,7 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { auth } from '../../lib/auth';
+import { auth, resolveRole } from '../../lib/auth';
 import { isDemoMode } from '../../lib/db';
 import { Mail, AlertTriangle, KeyRound } from 'lucide-react';
 
@@ -26,7 +26,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const redirect = searchParams.get('next') || '/dashboard';
+  const requestedNext = searchParams.get('next');
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +36,10 @@ function LoginForm() {
       setLoading(true);
       setError(null);
       await auth.login(email, password);
-      router.push(redirect);
+      // Role-based redirect: staff => admin app, clients => portal.
+      // An explicit ?next= (e.g. a deep link that bounced through login) wins.
+      const { destination } = await resolveRole(email);
+      router.push(requestedNext || destination);
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'Invalid email or password. Please try again.');
@@ -50,7 +53,8 @@ function LoginForm() {
       setLoading(true);
       setError(null);
       await auth.login('estimator@schmidtconstruction.com');
-      router.push(redirect);
+      const { destination } = await resolveRole('estimator@schmidtconstruction.com');
+      router.push(requestedNext || destination);
     } catch (err: any) {
       console.error(err);
       setError('Error triggering demo session bypass.');

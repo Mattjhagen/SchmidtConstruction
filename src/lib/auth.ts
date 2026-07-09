@@ -2,6 +2,7 @@
 // Location: src/lib/auth.ts
 
 import { isSupabaseConfigured } from './db';
+import { db } from './db';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -102,4 +103,44 @@ export async function getAuthUserId(): Promise<string | null> {
     return data.user?.id ?? null;
   }
   return null;
+}
+
+// The audience a signed-in user belongs to. Employees/admins use the estimator
+// app; everyone else is treated as a portal client.
+export type Audience = 'admin' | 'employee' | 'client';
+
+export interface ResolvedRole {
+  audience: Audience;
+  destination: string; // where to send the user after login
+}
+
+// Decide where a signed-in user should land, based on the employees table.
+// - A user whose auth id (Supabase) or email matches an employee row with
+//   role 'admin'    => admin app (/dashboard)
+//   role 'employee' => admin app (/dashboard) — staff self-service + estimating
+// - Anyone else (a quote recipient with a Supabase account) => client portal.
+export async function resolveRole(email?: string): Promise<ResolvedRole> {
+  try {
+    // Linking happens ONLY via a redeemed invite token (see /invite/[token]).
+    // Here we simply read the current link state to decide the destination.
+    const uid = await getAuthUserId();
+    const employees = await db.getEmployees();
+
+    let match = null as Awaited<ReturnType<typeof db.getEmployees>>[number] | null;
+    if (uid) match = employees.find((e) => e.user_id === uid) ?? null;
+    if (!match && email) {
+      match = employees.find((e) => e.email.toLowerCase() === email.toLowerCase()) ?? null;
+    }
+
+    if (match && match.active) {
+      return {
+        audience: match.role === 'admin' ? 'admin' : 'employee',
+        destination: '/dashboard',
+      };
+    }
+  } catch (e) {
+    // If the employees lookup fails, fall through to client (least privilege).
+    console.error('resolveRole failed, defaulting to client portal:', e);
+  }
+  return { audience: 'client', destination: '/portal/dashboard' };
 }

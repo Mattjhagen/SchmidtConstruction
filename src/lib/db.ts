@@ -1638,6 +1638,77 @@ export const db = {
     }
   },
 
+  // --- TIME CLOCK: EMPLOYEE INVITES (Phase 7) ---
+  // Admin generates a one-time invite token for an employee row.
+  // Returns the token (also persisted on the row) so the UI can build the link.
+  async generateEmployeeInvite(employeeId: string): Promise<string> {
+    const token = generateUUID();
+    const invited_at = new Date().toISOString();
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('employees')
+        .update({ invite_token: token, invited_at }).eq('id', employeeId);
+      if (error) throw error;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<Employee[]>('schmidt_employees', []);
+      const idx = list.findIndex((e) => e.id === employeeId);
+      if (idx === -1) throw new Error('Employee not found');
+      list[idx] = { ...list[idx], invite_token: token, invited_at };
+      setLocalStorageData('schmidt_employees', list);
+    }
+    return token;
+  },
+
+  // Admin revokes a pending invite (clears the token without linking).
+  async revokeEmployeeInvite(employeeId: string): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('employees')
+        .update({ invite_token: null, invited_at: null }).eq('id', employeeId);
+      if (error) throw error;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<Employee[]>('schmidt_employees', []);
+      const idx = list.findIndex((e) => e.id === employeeId);
+      if (idx === -1) return;
+      list[idx] = { ...list[idx], invite_token: null, invited_at: null };
+      setLocalStorageData('schmidt_employees', list);
+    }
+  },
+
+  // Public-safe: resolve who an invite is for (name/email) before sign-in.
+  async getInviteInfo(token: string): Promise<{ name: string; email: string; already_linked: boolean } | null> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.rpc('get_invite_info', { token });
+      if (error) { console.error('get_invite_info failed:', error); return null; }
+      const row = Array.isArray(data) ? data[0] : data;
+      return row ?? null;
+    } else {
+      initLocalStorageDB();
+      const list = getLocalStorageData<Employee[]>('schmidt_employees', []);
+      const e = list.find((x) => x.invite_token === token);
+      return e ? { name: e.name, email: e.email, already_linked: !!e.user_id } : null;
+    }
+  },
+
+  // The signed-in user redeems an invite token. Enforces email match server-side.
+  // Returns the linked Employee, or throws with a user-facing message.
+  async redeemEmployeeInvite(token: string): Promise<Employee> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.rpc('redeem_employee_invite', { token });
+      if (error) throw new Error(error.message || 'Could not redeem invite.');
+      return data as Employee;
+    } else {
+      // Demo mode: link to the matching row (no real auth email to compare).
+      initLocalStorageDB();
+      const list = getLocalStorageData<Employee[]>('schmidt_employees', []);
+      const idx = list.findIndex((e) => e.invite_token === token && !e.user_id);
+      if (idx === -1) throw new Error('Invalid or already-used invite.');
+      list[idx] = { ...list[idx], user_id: `demo-${list[idx].id}`, invite_token: null, invited_at: null };
+      setLocalStorageData('schmidt_employees', list);
+      return list[idx];
+    }
+  },
+
   // --- TIME CLOCK: TIME ENTRIES (Phase 7) ---
   async getTimeEntries(employeeId?: string): Promise<TimeEntry[]> {
     if (isSupabaseConfigured && supabase) {

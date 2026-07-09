@@ -48,10 +48,10 @@ export default function MarketingFooter() {
             <p className="mt-1">Serving {site.serviceArea}.</p>
           </div>
           <a
-            href="/login"
+            href="https://login.schmidt-construction.com/login"
             className="text-gray-600 hover:text-gray-400 transition-colors border border-gray-700 hover:border-gray-600 rounded px-3 py-1.5 whitespace-nowrap"
           >
-            Admin Portal
+            Employee &amp; Client Login
           </a>
         </div>
       </div>
