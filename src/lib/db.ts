@@ -1847,50 +1847,6 @@ export const db = {
     }
   },
 
-  // Admin: manually create a completed time entry (for shifts that weren't clocked).
-  async createTimeEntry(entry: {
-    employee_id: string;
-    clock_in: string;
-    clock_out: string | null;
-    break_minutes?: number;
-    project_id?: string | null;
-    notes?: string;
-  }): Promise<TimeEntry> {
-    const newEntry: TimeEntry = {
-      id: generateUUID(),
-      employee_id: entry.employee_id,
-      clock_in: entry.clock_in,
-      clock_out: entry.clock_out,
-      break_minutes: entry.break_minutes ?? 0,
-      project_id: entry.project_id ?? null,
-      notes: entry.notes ?? '',
-      created_at: new Date().toISOString(),
-    };
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('time_entries').insert([newEntry]).select().single();
-      if (error) throw error;
-      return data;
-    } else {
-      initLocalStorageDB();
-      const list = getLocalStorageData<TimeEntry[]>('schmidt_time_entries', []);
-      list.push(newEntry);
-      setLocalStorageData('schmidt_time_entries', list);
-      return newEntry;
-    }
-  },
-
-  // Admin: delete a time entry.
-  async deleteTimeEntry(id: string): Promise<void> {
-    if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('time_entries').delete().eq('id', id);
-      if (error) throw error;
-    } else {
-      initLocalStorageDB();
-      const list = getLocalStorageData<TimeEntry[]>('schmidt_time_entries', []);
-      setLocalStorageData('schmidt_time_entries', list.filter((t) => t.id !== id));
-    }
-  },
-
   sanitizeProposalVersionForClient(version: ProposalVersion): ProposalVersion {
     const sanitized = { ...version };
     // Securely delete internal notes so they never reach the client payload
