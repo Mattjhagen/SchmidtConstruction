@@ -80,7 +80,7 @@ export default function MarketingFooter() {
             <p className="mt-0.5">Serving {site.serviceArea}.</p>
           </div>
           <a
-            href="https://login.schmidt-construction.com"
+            href="/login"
             className="text-gray-600 hover:text-gray-400 transition-colors border rounded px-3 py-1.5 whitespace-nowrap"
             style={{ borderColor: 'rgba(255,255,255,0.15)' }}
           >
