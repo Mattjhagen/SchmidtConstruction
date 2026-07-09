@@ -3,14 +3,14 @@
 
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, Fragment } from 'react';
 import { db } from '@/lib/db';
 import { Employee, TimeEntry } from '@/lib/types';
 import { summarizeTimesheet, formatCurrency } from '@/lib/timeclock';
 import { buildTimesheetPdf, buildTimesheetCsv, downloadBlob } from '@/lib/timesheetPdf';
 import { getSupabaseBrowser } from '@/lib/supabaseClient';
 import { isDemoMode } from '@/lib/db';
-import { CalendarRange, Download, Users, Clock, TrendingUp, DollarSign, UserPlus, X, CheckCircle2, Link2, Copy, Ban, FileText, Mail, Plus, Pencil, User } from 'lucide-react';
+import { CalendarRange, Download, Users, Clock, TrendingUp, DollarSign, UserPlus, X, CheckCircle2, Link2, Copy, Ban, FileText, Mail, Plus, Pencil, User, ChevronDown, ChevronRight, Trash2, Check } from 'lucide-react';
 
 // Default the range to the current ISO week (Mon–Sun).
 function currentWeekRange(): { from: string; to: string } {
@@ -35,6 +35,11 @@ export default function TimesheetsPage() {
   // Inline roster edit state.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{ name: string; hourly_rate: number; role: 'employee' | 'admin' }>({ name: '', hourly_rate: 0, role: 'employee' });
+  // Per-shift edit/delete state (expand an employee to see individual shifts).
+  const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
+  const [editingShift, setEditingShift] = useState<string | null>(null);
+  const [shiftForm, setShiftForm] = useState<{ date: string; clock_in: string; clock_out: string; break_minutes: number }>({ date: '', clock_in: '', clock_out: '', break_minutes: 0 });
+  const [shiftBusy, setShiftBusy] = useState(false);
   const [range, setRange] = useState(currentWeekRange());
   const [loading, setLoading] = useState(true);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
@@ -279,6 +284,58 @@ export default function TimesheetsPage() {
       role: editForm.role,
     });
     setEditingId(null);
+    await load();
+  };
+
+  // ---- Per-shift edit / delete (admin) ----
+  // Local date (YYYY-MM-DD) and time (HH:MM) from an ISO timestamp.
+  const isoToDate = (iso: string) => {
+    const d = new Date(iso);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+  const isoToTime = (iso: string) => {
+    const d = new Date(iso);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+
+  const startShiftEdit = (entry: { id: string; clock_in: string; clock_out: string | null; break_minutes: number }) => {
+    setEditingShift(entry.id);
+    setShiftForm({
+      date: isoToDate(entry.clock_in),
+      clock_in: isoToTime(entry.clock_in),
+      clock_out: entry.clock_out ? isoToTime(entry.clock_out) : '',
+      break_minutes: entry.break_minutes,
+    });
+  };
+  const cancelShiftEdit = () => setEditingShift(null);
+
+  const saveShiftEdit = async (id: string) => {
+    setShiftBusy(true);
+    try {
+      const clockIn = new Date(`${shiftForm.date}T${shiftForm.clock_in}:00`);
+      const updates: Record<string, unknown> = {
+        clock_in: clockIn.toISOString(),
+        break_minutes: shiftForm.break_minutes,
+      };
+      // Only set clock_out if a time was provided (blank keeps the shift open).
+      updates.clock_out = shiftForm.clock_out
+        ? new Date(`${shiftForm.date}T${shiftForm.clock_out}:00`).toISOString()
+        : null;
+      await db.updateTimeEntry(id, updates);
+      setEditingShift(null);
+      await load();
+    } catch (e) {
+      console.error('Failed to save shift:', e);
+    } finally {
+      setShiftBusy(false);
+    }
+  };
+
+  const deleteShift = async (id: string) => {
+    if (!confirm('Delete this shift? This cannot be undone.')) return;
+    await db.deleteTimeEntry(id);
     await load();
   };
 
@@ -558,18 +615,107 @@ export default function TimesheetsPage() {
               <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">No hours in this period.</td></tr>
             )}
             {summaries.map((s) => (
-              <tr key={s.employee_id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-4 py-3 font-medium text-slate-800">{s.employee_name}</td>
-                <td className="px-4 py-3 text-right text-slate-600">{formatCurrency(s.hourly_rate)}</td>
-                <td className="px-4 py-3 text-right text-slate-700">{s.regular_hours.toFixed(2)}</td>
-                <td className={`px-4 py-3 text-right font-medium ${s.overtime_hours > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
-                  {s.overtime_hours.toFixed(2)}
-                </td>
-                <td className="px-4 py-3 text-right font-semibold text-slate-900">{s.total_hours.toFixed(2)}</td>
-                <td className="px-4 py-3 text-right text-slate-600">{formatCurrency(s.regular_pay)}</td>
-                <td className="px-4 py-3 text-right text-amber-700">{formatCurrency(s.overtime_pay)}</td>
-                <td className="px-4 py-3 text-right font-bold text-green-700">{formatCurrency(s.total_pay)}</td>
-              </tr>
+              <Fragment key={s.employee_id}>
+                <tr
+                  className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => setExpandedEmp(expandedEmp === s.employee_id ? null : s.employee_id)}
+                >
+                  <td className="px-4 py-3 font-medium text-slate-800">
+                    <span className="inline-flex items-center">
+                      {expandedEmp === s.employee_id
+                        ? <ChevronDown className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
+                        : <ChevronRight className="h-3.5 w-3.5 mr-1.5 text-slate-400" />}
+                      {s.employee_name}
+                      <span className="ml-2 text-xs font-normal text-slate-400">
+                        ({s.entries.length} shift{s.entries.length !== 1 ? 's' : ''})
+                      </span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">{formatCurrency(s.hourly_rate)}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{s.regular_hours.toFixed(2)}</td>
+                  <td className={`px-4 py-3 text-right font-medium ${s.overtime_hours > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                    {s.overtime_hours.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-900">{s.total_hours.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-slate-600">{formatCurrency(s.regular_pay)}</td>
+                  <td className="px-4 py-3 text-right text-amber-700">{formatCurrency(s.overtime_pay)}</td>
+                  <td className="px-4 py-3 text-right font-bold text-green-700">{formatCurrency(s.total_pay)}</td>
+                </tr>
+                {expandedEmp === s.employee_id && (
+                  <tr className="bg-slate-50/60">
+                    <td colSpan={8} className="px-4 py-3">
+                      {s.entries.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-2 text-center">No shifts in this period.</p>
+                      ) : (
+                        <table className="w-full text-xs">
+                          <thead className="text-slate-400 uppercase">
+                            <tr>
+                              <th className="text-left px-2 py-1 font-semibold">Date</th>
+                              <th className="text-left px-2 py-1 font-semibold">In</th>
+                              <th className="text-left px-2 py-1 font-semibold">Out</th>
+                              <th className="text-right px-2 py-1 font-semibold">Break</th>
+                              <th className="text-right px-2 py-1 font-semibold">Hours</th>
+                              {isAdmin && <th className="text-right px-2 py-1 font-semibold">Actions</th>}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {s.entries.map((en) => editingShift === en.id ? (
+                              <tr key={en.id} className="border-t border-slate-200 bg-blue-50/50">
+                                <td className="px-2 py-1">
+                                  <input type="date" value={shiftForm.date} onChange={(ev) => setShiftForm({ ...shiftForm, date: ev.target.value })}
+                                    className="border border-slate-300 rounded px-1.5 py-0.5 text-xs" />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input type="time" value={shiftForm.clock_in} onChange={(ev) => setShiftForm({ ...shiftForm, clock_in: ev.target.value })}
+                                    className="border border-slate-300 rounded px-1.5 py-0.5 text-xs" />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input type="time" value={shiftForm.clock_out} onChange={(ev) => setShiftForm({ ...shiftForm, clock_out: ev.target.value })}
+                                    className="border border-slate-300 rounded px-1.5 py-0.5 text-xs" />
+                                </td>
+                                <td className="px-2 py-1 text-right">
+                                  <input type="number" min={0} value={shiftForm.break_minutes} onChange={(ev) => setShiftForm({ ...shiftForm, break_minutes: Math.max(0, parseInt(ev.target.value) || 0) })}
+                                    className="w-14 border border-slate-300 rounded px-1.5 py-0.5 text-xs text-right" />
+                                </td>
+                                <td className="px-2 py-1 text-right text-slate-400">—</td>
+                                <td className="px-2 py-1 text-right whitespace-nowrap">
+                                  <button onClick={() => saveShiftEdit(en.id)} disabled={shiftBusy}
+                                    className="inline-flex items-center text-green-700 hover:text-green-900 cursor-pointer mr-2" title="Save">
+                                    <Check className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button onClick={cancelShiftEdit} className="inline-flex items-center text-slate-400 hover:text-slate-600 cursor-pointer" title="Cancel">
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ) : (
+                              <tr key={en.id} className="border-t border-slate-200">
+                                <td className="px-2 py-1 text-slate-700">{new Date(en.clock_in).toLocaleDateString()}</td>
+                                <td className="px-2 py-1 text-slate-600">{new Date(en.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                                <td className="px-2 py-1 text-slate-600">
+                                  {en.clock_out ? new Date(en.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-green-600">In progress</span>}
+                                </td>
+                                <td className="px-2 py-1 text-right text-slate-500">{en.break_minutes}m</td>
+                                <td className="px-2 py-1 text-right font-medium text-slate-800">{en.is_open ? '—' : en.worked_hours.toFixed(2)}</td>
+                                {isAdmin && (
+                                  <td className="px-2 py-1 text-right whitespace-nowrap">
+                                    <button onClick={() => startShiftEdit(en)} className="inline-flex items-center text-slate-400 hover:text-blue-700 cursor-pointer mr-2" title="Edit shift">
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button onClick={() => deleteShift(en.id)} className="inline-flex items-center text-slate-400 hover:text-red-600 cursor-pointer" title="Delete shift">
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>
