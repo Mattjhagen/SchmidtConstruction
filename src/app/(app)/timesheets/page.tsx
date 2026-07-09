@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, useCallback, Fragment } from 'react';
 import { db } from '@/lib/db';
 import { Employee, TimeEntry } from '@/lib/types';
 import { summarizeTimesheet, formatCurrency } from '@/lib/timeclock';
-import { buildTimesheetPdf, buildTimesheetCsv, downloadBlob } from '@/lib/timesheetPdf';
+import { buildTimesheetPdf, buildTimesheetCsv, downloadBlob, timesheetFilename } from '@/lib/timesheetPdf';
 import { getSupabaseBrowser } from '@/lib/supabaseClient';
 import { isDemoMode } from '@/lib/db';
 import { CalendarRange, Download, Users, Clock, TrendingUp, DollarSign, UserPlus, X, CheckCircle2, Link2, Copy, Ban, FileText, Mail, Plus, Pencil, User, ChevronDown, ChevronRight, Trash2, Check } from 'lucide-react';
@@ -194,7 +194,7 @@ export default function TimesheetsPage() {
     setPdfBusy(true);
     try {
       const blob = await buildTimesheetPdf(summaries, pdfMeta());
-      downloadBlob(blob, `Schmidt-Timesheet_${range.from}_to_${range.to}.pdf`);
+      downloadBlob(blob, timesheetFilename(pdfMeta(), 'pdf'));
     } catch (e) {
       console.error('PDF generation failed:', e);
     } finally {
@@ -245,8 +245,8 @@ export default function TimesheetsPage() {
           })),
           totals: { hours: totals.hours, overtime: totals.ot, pay: totals.pay },
           attachments: [
-            { filename: `Schmidt-Timesheet_${range.from}_to_${range.to}.pdf`, content: pdfB64 },
-            { filename: `Schmidt-Timesheet_${range.from}_to_${range.to}.csv`, content: csvB64 },
+            { filename: timesheetFilename(pdfMeta(), 'pdf'), content: pdfB64 },
+            { filename: timesheetFilename(pdfMeta(), 'csv'), content: csvB64 },
           ],
         }),
       });
