@@ -1,14 +1,18 @@
 // Authentication Service (Supabase Auth + Demo Mock Session)
 // Location: src/lib/auth.ts
+//
+// IMPORTANT: login/logout/session use the @supabase/ssr BROWSER client
+// (getSupabaseBrowser) so the session is stored in COOKIES — the same place
+// the proxy/middleware and server components read it. Using the plain
+// @supabase/supabase-js client here would store the session only in
+// localStorage, so the middleware would never see it and would bounce the
+// user back to /login (an infinite "nothing happens" loop).
 
 import { isSupabaseConfigured } from './db';
-import { db } from './db';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseBrowser } from './supabaseClient';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null;
+// Cookie-backed browser client (only in the browser + when configured).
+const supabase = isSupabaseConfigured && typeof window !== 'undefined' ? getSupabaseBrowser() : null;
 
 export interface SessionUser {
   email: string;
@@ -121,22 +125,29 @@ export interface ResolvedRole {
 // - Anyone else (a quote recipient with a Supabase account) => client portal.
 export async function resolveRole(email?: string): Promise<ResolvedRole> {
   try {
-    // Linking happens ONLY via a redeemed invite token (see /invite/[token]).
-    // Here we simply read the current link state to decide the destination.
-    const uid = await getAuthUserId();
-    const employees = await db.getEmployees();
+    // Query the employees table through the SAME cookie-backed client that
+    // holds the just-established session, so RLS sees the authenticated user.
+    // (Using db.getEmployees(), which has its own client, can run
+    // unauthenticated right after login and misroute staff to the portal.)
+    if (isSupabaseConfigured && supabase) {
+      const { data: { user } } = await supabase.auth.getUser();
+      let match: { role: string; active: boolean } | null = null;
 
-    let match = null as Awaited<ReturnType<typeof db.getEmployees>>[number] | null;
-    if (uid) match = employees.find((e) => e.user_id === uid) ?? null;
-    if (!match && email) {
-      match = employees.find((e) => e.email.toLowerCase() === email.toLowerCase()) ?? null;
-    }
+      if (user) {
+        const { data } = await supabase
+          .from('employees')
+          .select('role, active')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        match = data ?? null;
+      }
 
-    if (match && match.active) {
-      return {
-        audience: match.role === 'admin' ? 'admin' : 'employee',
-        destination: '/dashboard',
-      };
+      if (match && match.active) {
+        return {
+          audience: match.role === 'admin' ? 'admin' : 'employee',
+          destination: '/dashboard',
+        };
+      }
     }
   } catch (e) {
     // If the employees lookup fails, fall through to client (least privilege).

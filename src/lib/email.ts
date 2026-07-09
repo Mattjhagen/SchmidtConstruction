@@ -299,7 +299,7 @@ export async function sendTimesheetEmail({
         </td></tr>
         <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 32px;">
           <p style="margin:0;color:#0f172a;font-size:13px;font-weight:700;">Schmidt Construction</p>
-          <p style="margin:4px 0 0;color:#94a3b8;font-size:12px;">Omaha, Nebraska · (402) 320-2600 · Mikiel@schmidt-construction.com</p>
+          <p style="margin:4px 0 0;color:#94a3b8;font-size:12px;">Omaha, Nebraska · (402) 320-2600 · Mike@walls2.com</p>
         </td></tr>
       </table>
     </td></tr>

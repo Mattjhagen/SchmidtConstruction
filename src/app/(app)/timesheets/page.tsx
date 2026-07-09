@@ -10,7 +10,7 @@ import { summarizeTimesheet, formatCurrency } from '@/lib/timeclock';
 import { buildTimesheetPdf, buildTimesheetCsv, downloadBlob } from '@/lib/timesheetPdf';
 import { getSupabaseBrowser } from '@/lib/supabaseClient';
 import { isDemoMode } from '@/lib/db';
-import { CalendarRange, Download, Users, Clock, TrendingUp, DollarSign, UserPlus, X, CheckCircle2, Link2, Copy, Ban, FileText, Mail, Plus } from 'lucide-react';
+import { CalendarRange, Download, Users, Clock, TrendingUp, DollarSign, UserPlus, X, CheckCircle2, Link2, Copy, Ban, FileText, Mail, Plus, Pencil, User } from 'lucide-react';
 
 // Default the range to the current ISO week (Mon–Sun).
 function currentWeekRange(): { from: string; to: string } {
@@ -27,6 +27,14 @@ function currentWeekRange(): { from: string; to: string } {
 export default function TimesheetsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
+  // Who is viewing: their employee row + whether they're an admin.
+  const [me, setMe] = useState<Employee | null>(null);
+  const isAdmin = me?.role === 'admin';
+  // Admin toggle: show only my own timesheet.
+  const [myOnly, setMyOnly] = useState(false);
+  // Inline roster edit state.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ name: string; hourly_rate: number; role: 'employee' | 'admin' }>({ name: '', hourly_rate: 0, role: 'employee' });
   const [range, setRange] = useState(currentWeekRange());
   const [loading, setLoading] = useState(true);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
@@ -55,9 +63,30 @@ export default function TimesheetsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // Resolve the current viewer first.
+      let current: Employee | null = null;
+      if (!isDemoMode) {
+        const { data: { user } } = await getSupabaseBrowser().auth.getUser();
+        if (user) {
+          const emps0 = await db.getEmployees();
+          current = emps0.find((e) => e.user_id === user.id) ?? null;
+        }
+      }
+      setMe(current);
+
+      const admin = current?.role === 'admin';
       const [emps, allEntries] = await Promise.all([db.getEmployees(), db.getTimeEntries()]);
-      setEmployees(emps);
-      setEntries(allEntries);
+      // Non-admins only ever see themselves (belt-and-suspenders on top of RLS).
+      if (admin) {
+        setEmployees(emps);
+        setEntries(allEntries);
+      } else if (current) {
+        setEmployees(emps.filter((e) => e.id === current!.id));
+        setEntries(allEntries.filter((t) => t.employee_id === current!.id));
+      } else {
+        setEmployees(emps);
+        setEntries(allEntries);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -80,9 +109,11 @@ export default function TimesheetsPage() {
   // Build a payroll summary per employee.
   const summaries = useMemo(() => {
     return employees
+      // Admin "My timesheet only" toggle narrows to the viewer's own row.
+      .filter((e) => !(isAdmin && myOnly) || e.id === me?.id)
       .filter((e) => e.role !== 'admin' || entriesInRange.some((t) => t.employee_id === e.id))
       .map((emp) => summarizeTimesheet(emp, entriesInRange.filter((t) => t.employee_id === emp.id)));
-  }, [employees, entriesInRange]);
+  }, [employees, entriesInRange, isAdmin, myOnly, me]);
 
   const totals = useMemo(() => summaries.reduce(
     (acc, s) => ({
@@ -235,6 +266,22 @@ export default function TimesheetsPage() {
     await load();
   };
 
+  // Inline roster editing (admin only): rename, set rate, change role.
+  const startEdit = (emp: Employee) => {
+    setEditingId(emp.id);
+    setEditForm({ name: emp.name, hourly_rate: emp.hourly_rate, role: emp.role });
+  };
+  const cancelEdit = () => setEditingId(null);
+  const saveEdit = async (id: string) => {
+    await db.updateEmployee(id, {
+      name: editForm.name.trim(),
+      hourly_rate: editForm.hourly_rate,
+      role: editForm.role,
+    });
+    setEditingId(null);
+    await load();
+  };
+
   // Build the full invite URL for a token (uses the login subdomain in prod).
   const inviteUrl = (token: string) => {
     if (typeof window !== 'undefined') {
@@ -279,11 +326,12 @@ export default function TimesheetsPage() {
             <Users className="h-6 w-6 text-amber-500" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Timesheets & Payroll</h1>
-            <p className="text-sm text-slate-500">Overtime is calculated per week (&gt;40 hrs at 1.5&times;)</p>
+            <h1 className="text-2xl font-bold text-slate-900">{isAdmin ? 'Timesheets & Payroll' : 'My Timesheet'}</h1>
+            <p className="text-sm text-slate-500">{isAdmin ? 'Overtime is calculated per week (>40 hrs at 1.5×)' : 'Your hours and pay. Overtime is calculated per week (>40 hrs at 1.5×).'}</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
+          {isAdmin && (
           <button
             onClick={() => setShowAddEmployee(true)}
             className="inline-flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer"
@@ -291,6 +339,7 @@ export default function TimesheetsPage() {
             <UserPlus className="h-4 w-4" />
             <span>Add Employee</span>
           </button>
+          )}
           <button
             onClick={exportCsv}
             className="inline-flex items-center space-x-2 bg-blue-700 hover:bg-blue-800 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer"
@@ -298,6 +347,7 @@ export default function TimesheetsPage() {
             <Download className="h-4 w-4" />
             <span>Export CSV</span>
           </button>
+          {isAdmin && (
           <button
             onClick={() => setShowAddHours(true)}
             className="inline-flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer"
@@ -305,6 +355,7 @@ export default function TimesheetsPage() {
             <Plus className="h-4 w-4" />
             <span>Add Hours</span>
           </button>
+          )}
           <button
             onClick={handleDownloadPdf}
             disabled={pdfBusy}
@@ -313,6 +364,7 @@ export default function TimesheetsPage() {
             <FileText className="h-4 w-4" />
             <span>{pdfBusy ? 'Building…' : 'Download PDF'}</span>
           </button>
+          {isAdmin && (
           <button
             onClick={() => { setSendResult(null); setShowEmail(true); }}
             className="inline-flex items-center space-x-2 bg-green-700 hover:bg-green-800 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer"
@@ -320,6 +372,7 @@ export default function TimesheetsPage() {
             <Mail className="h-4 w-4" />
             <span>Email Timesheet</span>
           </button>
+          )}
         </div>
       </div>
 
@@ -340,6 +393,18 @@ export default function TimesheetsPage() {
         </div>
         <button onClick={() => setRange(currentWeekRange())}
           className="text-sm text-blue-700 hover:text-blue-900 font-medium cursor-pointer">This week</button>
+        {isAdmin && (
+          <label className="ml-auto inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={myOnly}
+              onChange={(e) => setMyOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500"
+            />
+            <User className="h-4 w-4" />
+            My timesheet only
+          </label>
+        )}
       </div>
 
       {/* Totals */}
@@ -358,7 +423,8 @@ export default function TimesheetsPage() {
         </div>
       </div>
 
-      {/* Employee roster & account link status */}
+      {/* Employee roster & account link status (admins only) */}
+      {isAdmin && (
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
           <span className="font-semibold text-slate-700 text-sm">Employee Roster</span>
@@ -372,13 +438,41 @@ export default function TimesheetsPage() {
               <th className="text-left px-4 py-2 font-semibold">Role</th>
               <th className="text-right px-4 py-2 font-semibold">Rate</th>
               <th className="text-center px-4 py-2 font-semibold">Login Account</th>
+              {isAdmin && <th className="text-center px-4 py-2 font-semibold">Edit</th>}
             </tr>
           </thead>
           <tbody>
             {employees.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No employees yet — add one to get started.</td></tr>
+              <tr><td colSpan={isAdmin ? 6 : 5} className="px-4 py-6 text-center text-slate-400">No employees yet — add one to get started.</td></tr>
             )}
-            {employees.map((e) => (
+            {employees.map((e) => editingId === e.id ? (
+              <tr key={e.id} className="border-t border-slate-100 bg-blue-50/40">
+                <td className="px-4 py-2">
+                  <input value={editForm.name} onChange={(ev) => setEditForm({ ...editForm, name: ev.target.value })}
+                    className="w-full border border-slate-300 rounded px-2 py-1 text-sm" />
+                </td>
+                <td className="px-4 py-2 text-slate-500">{e.email || '—'}</td>
+                <td className="px-4 py-2">
+                  <select value={editForm.role} onChange={(ev) => setEditForm({ ...editForm, role: ev.target.value as 'employee' | 'admin' })}
+                    className="border border-slate-300 rounded px-2 py-1 text-sm">
+                    <option value="employee">employee</option>
+                    <option value="admin">admin</option>
+                  </select>
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <input type="number" min={0} step={0.5} value={editForm.hourly_rate}
+                    onChange={(ev) => setEditForm({ ...editForm, hourly_rate: parseFloat(ev.target.value) || 0 })}
+                    className="w-20 border border-slate-300 rounded px-2 py-1 text-sm text-right" />
+                </td>
+                <td className="px-4 py-2 text-center text-xs text-slate-400">
+                  {e.user_id ? 'Linked' : '—'}
+                </td>
+                <td className="px-4 py-2 text-center whitespace-nowrap">
+                  <button onClick={() => saveEdit(e.id)} className="text-xs font-semibold text-green-700 hover:text-green-900 cursor-pointer mr-2">Save</button>
+                  <button onClick={cancelEdit} className="text-xs font-medium text-slate-400 hover:text-slate-600 cursor-pointer">Cancel</button>
+                </td>
+              </tr>
+            ) : (
               <tr key={e.id} className="border-t border-slate-100">
                 <td className="px-4 py-2 font-medium text-slate-800">{e.name}</td>
                 <td className="px-4 py-2 text-slate-600">{e.email || <span className="text-slate-300">—</span>}</td>
@@ -423,6 +517,14 @@ export default function TimesheetsPage() {
                     </button>
                   )}
                 </td>
+                {isAdmin && (
+                  <td className="px-4 py-2 text-center">
+                    <button onClick={() => startEdit(e)}
+                      className="inline-flex items-center text-xs font-medium text-slate-500 hover:text-blue-700 cursor-pointer" title="Edit name, rate, role">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -431,6 +533,7 @@ export default function TimesheetsPage() {
           Add an employee with their work email, click <span className="font-medium text-slate-700">Generate invite</span> to copy a one-time link, and send it to them. They activate their account by signing in with that same email — the link only works for the matching email and can be revoked anytime.
         </div>
       </div>
+      )}
 
       {/* Per-employee table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">

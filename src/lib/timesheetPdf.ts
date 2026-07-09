@@ -46,7 +46,7 @@ export async function buildTimesheetPdf(
   doc.setFontSize(9);
   doc.setTextColor('#cbd5e1');
   doc.text('50+ Years of Family-Owned Excellence  ·  Omaha, NE', margin, 20);
-  doc.text('(402) 320-2600  ·  Mikiel@schmidt-construction.com', margin, 25);
+  doc.text('(402) 320-2600  ·  Mike@walls2.com', margin, 25);
 
   // Amber accent bar
   doc.setFillColor(217, 119, 6);
