@@ -42,17 +42,25 @@ export default function MarketingFooter() {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
+        <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
           <div className="text-center sm:text-left">
             <p>© {new Date().getFullYear()} {site.legalName}. All rights reserved. Licensed & Insured.</p>
             <p className="mt-1">Serving {site.serviceArea}.</p>
           </div>
-          <a
-            href="https://login.schmidt-construction.com/login"
-            className="text-gray-600 hover:text-gray-400 transition-colors border border-gray-700 hover:border-gray-600 rounded px-3 py-1.5 whitespace-nowrap"
-          >
-            Employee &amp; Client Login
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://login.schmidt-construction.com/portal/login"
+              className="text-gray-500 hover:text-yellow-400 transition-colors border border-gray-700 hover:border-yellow-700 rounded px-3 py-1.5 whitespace-nowrap"
+            >
+              Client Portal
+            </a>
+            <a
+              href="https://login.schmidt-construction.com/login"
+              className="text-gray-600 hover:text-gray-400 transition-colors border border-gray-700 hover:border-gray-600 rounded px-3 py-1.5 whitespace-nowrap"
+            >
+              Employee Login
+            </a>
+          </div>
         </div>
       </div>
     </footer>
