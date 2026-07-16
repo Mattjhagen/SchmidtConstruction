@@ -62,11 +62,20 @@ CREATE TABLE IF NOT EXISTS proposal_versions (
     UNIQUE (proposal_id, version_number)
 );
 
--- Add circular reference constraint to proposals
-ALTER TABLE proposals 
-ADD CONSTRAINT fk_current_version 
-FOREIGN KEY (current_version_id) 
-REFERENCES proposal_versions(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_current_version'
+    ) THEN
+        ALTER TABLE proposals
+        ADD CONSTRAINT fk_current_version
+        FOREIGN KEY (current_version_id)
+        REFERENCES proposal_versions(id)
+        ON DELETE SET NULL;
+    END IF;
+END $$;
 
 -- 5. PROPOSAL LINE ITEMS TABLE
 CREATE TABLE IF NOT EXISTS proposal_line_items (
@@ -111,6 +120,19 @@ ALTER TABLE proposals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE proposal_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE proposal_line_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE negotiation_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Estimators can manage all clients" ON clients;
+DROP POLICY IF EXISTS "Estimators can manage all projects" ON projects;
+DROP POLICY IF EXISTS "Estimators can manage all proposals" ON proposals;
+DROP POLICY IF EXISTS "Estimators can manage all proposal versions" ON proposal_versions;
+DROP POLICY IF EXISTS "Estimators can manage all line items" ON proposal_line_items;
+DROP POLICY IF EXISTS "Estimators can manage all negotiation events" ON negotiation_events;
+
+DROP POLICY IF EXISTS "Clients can view their shared proposals" ON proposals;
+DROP POLICY IF EXISTS "Clients can view proposal versions via share token" ON proposal_versions;
+DROP POLICY IF EXISTS "Clients can view line items via share token" ON proposal_line_items;
+DROP POLICY IF EXISTS "Clients can add comments/negotiation events" ON negotiation_events;
+DROP POLICY IF EXISTS "Clients can read comments/negotiation events" ON negotiation_events;
 
 -- 1. Owner/Estimator Access Policies (Allows authenticated users full write/read access)
 CREATE POLICY "Estimators can manage all clients" 
@@ -208,18 +230,90 @@ USING (
 -- SEED TEMPLATE DATA
 ---------------------------------------------------------
 
--- Add a default mock client for templates
-INSERT INTO clients (id, name, email, phone, address, notes) 
-VALUES ('c1111111-1111-1111-1111-111111111111', 'Schmidt Construction Templates', 'office@schmidtconstruction.com', '(402) 555-0199', 'Omaha, NE', 'System folder for template storage')
+
+
+-- Add default template client
+INSERT INTO clients (
+    id,
+    name,
+    email,
+    phone,
+    address,
+    notes
+)
+VALUES (
+    'c1111111-1111-1111-1111-111111111111',
+    'Schmidt Construction Templates',
+    'office@schmidtconstruction.com',
+    '(402) 555-0199',
+    'Omaha, NE',
+    'System folder for template storage'
+)
 ON CONFLICT (id) DO NOTHING;
 
--- Add template projects
-INSERT INTO projects (id, client_id, name, type, job_site_address, description, status)
-VALUES 
-('p1111111-1111-1111-1111-111111111111', 'c1111111-1111-1111-1111-111111111111', 'Template - Retaining Wall Replacement', 'retaining wall', 'Omaha, NE', 'Standard 80LF segmental block retaining wall, 4ft high.', 'Planning'),
-('p2222222-2222-2222-2222-222222222222', 'c1111111-1111-1111-1111-111111111111', 'Template - Drainage Correction', 'drainage', 'Omaha, NE', 'French drain, sump pump basin, and downspout extensions.', 'Planning'),
-('p3333333-3333-3333-3333-333333333333', 'c1111111-1111-1111-1111-111111111111', 'Template - Concrete Patio or Driveway', 'concrete', 'Omaha, NE', 'Standard 12x15 concrete patio or double-car driveway repair.', 'Planning'),
-('p4444444-4444-4444-4444-444444444444', 'c1111111-1111-1111-1111-111111111111', 'Template - Kitchen Remodel', 'kitchen remodel', 'Omaha, NE', 'Full kitchen transformation with custom cabinetry and quartz countertops.', 'Planning'),
-('p5555555-5555-5555-5555-555555555555', 'c1111111-1111-1111-1111-111111111111', 'Template - Bathroom Remodel', 'bathroom remodel', 'Omaha, NE', 'Modern bathroom with walk-in tile shower and new vanity.', 'Planning'),
-('p6666666-6666-6666-6666-666666666666', 'c1111111-1111-1111-1111-111111111111', 'Template - Small Commercial Concrete Repair', 'commercial', 'Omaha, NE', 'Sidewalk trip hazard grinding, localized slab-on-grade replacement.', 'Planning')
+-- Template projects
+INSERT INTO projects (
+    id,
+    client_id,
+    name,
+    type,
+    job_site_address,
+    description,
+    status
+)
+VALUES
+(
+    '11111111-1111-1111-1111-111111111111',
+    'c1111111-1111-1111-1111-111111111111',
+    'Template - Retaining Wall Replacement',
+    'retaining wall',
+    'Omaha, NE',
+    'Standard 80LF segmental block retaining wall, 4ft high.',
+    'Planning'
+),
+(
+    '22222222-2222-2222-2222-222222222222',
+    'c1111111-1111-1111-1111-111111111111',
+    'Template - Drainage Correction',
+    'drainage',
+    'Omaha, NE',
+    'French drain, sump pump basin, and downspout extensions.',
+    'Planning'
+),
+(
+    '33333333-3333-3333-3333-333333333333',
+    'c1111111-1111-1111-1111-111111111111',
+    'Template - Concrete Patio or Driveway',
+    'concrete',
+    'Omaha, NE',
+    'Standard 12x15 concrete patio or double-car driveway repair.',
+    'Planning'
+),
+(
+    '44444444-4444-4444-4444-444444444444',
+    'c1111111-1111-1111-1111-111111111111',
+    'Template - Kitchen Remodel',
+    'kitchen remodel',
+    'Omaha, NE',
+    'Full kitchen transformation with custom cabinetry and quartz countertops.',
+    'Planning'
+),
+(
+    '55555555-5555-5555-5555-555555555555',
+    'c1111111-1111-1111-1111-111111111111',
+    'Template - Bathroom Remodel',
+    'bathroom remodel',
+    'Omaha, NE',
+    'Modern bathroom with walk-in tile shower and new vanity.',
+    'Planning'
+),
+(
+    '66666666-6666-6666-6666-666666666666',
+    'c1111111-1111-1111-1111-111111111111',
+    'Template - Small Commercial Concrete Repair',
+    'commercial',
+    'Omaha, NE',
+    'Sidewalk trip hazard grinding, localized slab-on-grade replacement.',
+    'Planning'
+)
 ON CONFLICT (id) DO NOTHING;
