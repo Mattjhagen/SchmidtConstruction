@@ -207,6 +207,79 @@ export async function sendProposalEmail({
 }
 
 // ============================================================
+// MESSAGE REPLY EMAIL
+// ============================================================
+
+export interface SendMessageReplyEmailParams {
+  to: string;
+  clientName: string;
+  subject: string;
+  replyBody: string;
+}
+
+export async function sendMessageReplyEmail({
+  to,
+  clientName,
+  subject,
+  replyBody,
+}: SendMessageReplyEmailParams) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  const overrideTo = process.env.EMAIL_OVERRIDE_TO?.trim();
+  const recipient = overrideTo || to;
+  const replyTo = process.env.PROPOSAL_REPLY_TO;
+
+  const escapedBody = replyBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+        <tr><td style="background:#0f172a;padding:24px 36px;">
+          <img src="${siteUrl}/logo.png" width="180" alt="Schmidt Construction" style="display:block;border:0;max-width:180px;height:auto;" />
+          <p style="margin:14px 0 0;color:#fff;font-size:17px;font-weight:700;">New Message from Schmidt Construction</p>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
+            Hello <strong style="color:#0f172a;">${clientName}</strong>,
+          </p>
+          <p style="margin:0 0 24px;color:#475569;font-size:14px;line-height:1.6;">
+            You have a new message regarding: <strong style="color:#0f172a;">${subject}</strong>
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #1d4ed8;border-radius:8px;margin-bottom:28px;">
+            <tr><td style="padding:20px 24px;font-size:14px;color:#334155;line-height:1.7;">${escapedBody}</td></tr>
+          </table>
+          <p style="margin:0;color:#475569;font-size:14px;line-height:1.7;">
+            To reply, simply respond to this email or contact us directly.<br/>
+            Thank you for choosing Schmidt Construction.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 36px;">
+          <p style="margin:0;color:#0f172a;font-size:13px;font-weight:700;">Schmidt Construction</p>
+          <p style="margin:4px 0 0;color:#94a3b8;font-size:12px;">Omaha, Nebraska · office@schmidtconstruction.com · (402) 320-2600</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const emailSubject = overrideTo
+    ? `[EMAIL OVERRIDE] Re: ${subject} — Schmidt Construction`
+    : `Re: ${subject} — Schmidt Construction`;
+
+  return await getResend().emails.send({
+    from: process.env.PROPOSAL_FROM_EMAIL ?? 'Schmidt Construction <Mikiel@schmidt-construction.com>',
+    to: recipient,
+    subject: emailSubject,
+    html,
+    ...(replyTo ? { replyTo } : {}),
+  });
+}
+
+// ============================================================
 // TIMESHEET EMAIL (Phase 7)
 // ============================================================
 

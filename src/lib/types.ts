@@ -370,3 +370,30 @@ export interface TimesheetSummary {
   total_pay: number;
   entries: TimeEntryWithHours[];
 }
+
+// --- MESSAGES ---
+export type MessageSenderType = 'admin' | 'client';
+export type ThreadSource = 'portal' | 'quote' | 'contact' | 'manual';
+
+export interface MessageThread {
+  id: string;
+  created_at: string;
+  client_id: string | null;
+  client_name: string;
+  client_email: string;
+  subject: string;
+  last_message_at: string;
+  last_message_preview: string;
+  unread_count: number;
+  source: ThreadSource;
+}
+
+export interface Message {
+  id: string;
+  created_at: string;
+  thread_id: string;
+  body: string;
+  sender_type: MessageSenderType;
+  sender_name: string;
+  is_read: boolean;
+}

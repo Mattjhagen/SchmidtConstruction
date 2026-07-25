@@ -11,6 +11,8 @@ import {
   NegotiationEvent,
   ProposalStatus,
   SavedProposalOption,
+  MessageThread,
+  Message,
 } from './types';
 import type { Employee, TimeEntry } from './types';
 import { PROPOSAL_TEMPLATES } from './templates';
@@ -833,6 +835,115 @@ const MOCK_TIME_ENTRIES: TimeEntry[] = [
   shift('t-dana-1', 'e-dana', 3, 8, 8, 30, 'p-kitchen-renovation'),
   shift('t-dana-2', 'e-dana', 2, 8, 8, 30, 'p-kitchen-renovation'),
   shift('t-dana-3', 'e-dana', 1, 8, 7.5, 30, null),
+];
+
+// --- MESSAGE MOCK DATA ---
+const MOCK_MESSAGE_THREADS: MessageThread[] = [
+  {
+    id: 'mt-john-doe',
+    created_at: new Date(Date.now() - 26 * 24 * 60 * 60 * 1000).toISOString(),
+    client_id: 'c-john-doe',
+    client_name: 'John Doe',
+    client_email: 'john.doe@email.com',
+    subject: 'Retaining Wall & Patio Project',
+    last_message_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    last_message_preview: 'When do you think the crew can start? We are ready to move forward.',
+    unread_count: 1,
+    source: 'portal',
+  },
+  {
+    id: 'mt-jane-smith',
+    created_at: new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString(),
+    client_id: 'c-jane-smith',
+    client_name: 'Jane Smith',
+    client_email: 'jane.smith@email.com',
+    subject: 'Drainage Work — Urgent',
+    last_message_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    last_message_preview: 'Do you have any availability this week? The basement is getting wet.',
+    unread_count: 2,
+    source: 'portal',
+  },
+  {
+    id: 'mt-quote-req-1',
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    client_id: null,
+    client_name: 'Mike Carlson',
+    client_email: 'mcarlson@email.com',
+    subject: 'Quote Request: Concrete Driveway',
+    last_message_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    last_message_preview: 'Hi, I would like a quote for a new concrete driveway — approx 60ft long.',
+    unread_count: 1,
+    source: 'contact',
+  },
+];
+
+const MOCK_MESSAGES: Message[] = [
+  // John Doe thread
+  {
+    id: 'msg-jd-1',
+    created_at: new Date(Date.now() - 26 * 24 * 60 * 60 * 1000).toISOString(),
+    thread_id: 'mt-john-doe',
+    body: 'Hi Schmidt Construction, I accepted the proposal for the retaining wall and patio combo. Looking forward to the work!',
+    sender_type: 'client',
+    sender_name: 'John Doe',
+    is_read: true,
+  },
+  {
+    id: 'msg-jd-2',
+    created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
+    thread_id: 'mt-john-doe',
+    body: 'John, great news! We will get you scheduled as soon as we lock in material delivery. We will be in touch early next week with a start date.',
+    sender_type: 'admin',
+    sender_name: 'Schmidt Construction',
+    is_read: true,
+  },
+  {
+    id: 'msg-jd-3',
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    thread_id: 'mt-john-doe',
+    body: 'When do you think the crew can start? We are ready to move forward.',
+    sender_type: 'client',
+    sender_name: 'John Doe',
+    is_read: false,
+  },
+  // Jane Smith thread
+  {
+    id: 'msg-js-1',
+    created_at: new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString(),
+    thread_id: 'mt-jane-smith',
+    body: 'Jane, I sent you the drainage proposal. Let us know if you have any questions. We can get out there quickly given the urgency.',
+    sender_type: 'admin',
+    sender_name: 'Schmidt Construction',
+    is_read: true,
+  },
+  {
+    id: 'msg-js-2',
+    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 - 60 * 60 * 1000).toISOString(),
+    thread_id: 'mt-jane-smith',
+    body: 'Thanks for the proposal. Do you have any availability this week? The basement is getting wet.',
+    sender_type: 'client',
+    sender_name: 'Jane Smith',
+    is_read: false,
+  },
+  {
+    id: 'msg-js-3',
+    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    thread_id: 'mt-jane-smith',
+    body: 'Do you have any availability this week? The basement is getting wet.',
+    sender_type: 'client',
+    sender_name: 'Jane Smith',
+    is_read: false,
+  },
+  // Quote request thread
+  {
+    id: 'msg-qr-1',
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    thread_id: 'mt-quote-req-1',
+    body: 'Hi, I would like a quote for a new concrete driveway — approx 60ft long, 12ft wide, single car. Located in Omaha 68114. Please let me know your availability for an estimate.',
+    sender_type: 'client',
+    sender_name: 'Mike Carlson',
+    is_read: false,
+  },
 ];
 
 // Initialize LocalStorage with Mock Data if empty
@@ -1902,7 +2013,105 @@ export const db = {
     const version = await this.getProposalVersion(id);
     if (!version) return null;
     return this.sanitizeProposalVersionForClient(version);
-  }
+  },
+
+  // --- MESSAGES ---
+  async getMessageThreads(): Promise<MessageThread[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('message_threads')
+        .select('*')
+        .order('last_message_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } else {
+      initLocalStorageDB();
+      return getLocalStorageData<MessageThread[]>('schmidt_message_threads', MOCK_MESSAGE_THREADS);
+    }
+  },
+
+  async getMessages(threadId: string): Promise<Message[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      await supabase.from('messages').update({ is_read: true }).eq('thread_id', threadId).eq('sender_type', 'client');
+      await supabase.from('message_threads').update({ unread_count: 0 }).eq('id', threadId);
+      return data || [];
+    } else {
+      initLocalStorageDB();
+      const allMessages = getLocalStorageData<Message[]>('schmidt_messages', MOCK_MESSAGES);
+      const threadMessages = allMessages.filter(m => m.thread_id === threadId);
+      const updated = allMessages.map(m =>
+        m.thread_id === threadId && m.sender_type === 'client' ? { ...m, is_read: true } : m
+      );
+      setLocalStorageData('schmidt_messages', updated);
+      const threads = getLocalStorageData<MessageThread[]>('schmidt_message_threads', MOCK_MESSAGE_THREADS);
+      setLocalStorageData('schmidt_message_threads', threads.map(t => t.id === threadId ? { ...t, unread_count: 0 } : t));
+      return threadMessages;
+    }
+  },
+
+  async createMessage(threadId: string, body: string, senderType: 'admin' | 'client', senderName: string): Promise<Message> {
+    const newMsg: Message = {
+      id: generateUUID(),
+      created_at: new Date().toISOString(),
+      thread_id: threadId,
+      body,
+      sender_type: senderType,
+      sender_name: senderName,
+      is_read: senderType === 'admin',
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('messages').insert([newMsg]).select().single();
+      if (error) throw error;
+      await supabase.from('message_threads').update({
+        last_message_at: newMsg.created_at,
+        last_message_preview: body.slice(0, 120),
+        unread_count: 0,
+      }).eq('id', threadId);
+      return data;
+    } else {
+      initLocalStorageDB();
+      const msgs = getLocalStorageData<Message[]>('schmidt_messages', MOCK_MESSAGES);
+      msgs.push(newMsg);
+      setLocalStorageData('schmidt_messages', msgs);
+      const threads = getLocalStorageData<MessageThread[]>('schmidt_message_threads', MOCK_MESSAGE_THREADS);
+      setLocalStorageData('schmidt_message_threads', threads.map(t =>
+        t.id === threadId
+          ? { ...t, last_message_at: newMsg.created_at, last_message_preview: body.slice(0, 120), unread_count: senderType === 'client' ? t.unread_count + 1 : 0 }
+          : t
+      ));
+      return newMsg;
+    }
+  },
+
+  async createMessageThread(thread: Omit<MessageThread, 'id' | 'created_at' | 'last_message_at' | 'unread_count'>): Promise<MessageThread> {
+    const now = new Date().toISOString();
+    const newThread: MessageThread = {
+      ...thread,
+      id: generateUUID(),
+      created_at: now,
+      last_message_at: now,
+      unread_count: 0,
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('message_threads').insert([newThread]).select().single();
+      if (error) throw error;
+      return data;
+    } else {
+      initLocalStorageDB();
+      const threads = getLocalStorageData<MessageThread[]>('schmidt_message_threads', MOCK_MESSAGE_THREADS);
+      threads.unshift(newThread);
+      setLocalStorageData('schmidt_message_threads', threads);
+      return newThread;
+    }
+  },
 };
 
 // ---------------------------------------------------------------------------
